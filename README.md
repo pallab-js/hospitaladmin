@@ -40,12 +40,11 @@ A modern, desktop-first hospital management system built with **Tauri 2**, **Sve
 # Install dependencies
 pnpm install
 
-# Start dev server (browser mode - no Tauri)
-pnpm dev
-
-# Start Tauri dev (desktop app)
+# Start Tauri dev (desktop app - required)
 pnpm tauri dev
 ```
+
+> **Note:** `pnpm dev` starts a Vite dev server for frontend hot-reload only. The app requires the Tauri/Rust backend for auth, database, and all commands — it will not function standalone in a browser.
 
 ### Build
 
@@ -56,7 +55,7 @@ pnpm tauri build
 
 ## Demo Credentials
 
-When running in browser mode (`pnpm dev`), the following demo accounts are available:
+The following demo accounts are seeded on first launch:
 
 | Username | Password | Role |
 |----------|----------|------|

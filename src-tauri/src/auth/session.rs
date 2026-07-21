@@ -36,12 +36,13 @@ pub fn set_session(session: Session) {
         },
         expires_at: now_epoch() + SESSION_EXPIRY_SECONDS,
     };
-    let mut s = CURRENT_SESSION.lock().unwrap();
-    *s = Some(entry);
+    if let Ok(mut s) = CURRENT_SESSION.lock() {
+        *s = Some(entry);
+    }
 }
 
 pub fn get_session() -> Option<Session> {
-    let s = CURRENT_SESSION.lock().unwrap();
+    let s = CURRENT_SESSION.lock().ok()?;
     match &*s {
         Some(entry) => {
             if now_epoch() > entry.expires_at {
@@ -54,15 +55,30 @@ pub fn get_session() -> Option<Session> {
     }
 }
 
+/// Refresh session expiry on activity. Returns true if refreshed.
+pub fn refresh_session() -> bool {
+    if let Ok(mut s) = CURRENT_SESSION.lock() {
+        if let Some(ref mut entry) = *s {
+            if now_epoch() <= entry.expires_at {
+                entry.expires_at = now_epoch() + SESSION_EXPIRY_SECONDS;
+                return true;
+            }
+        }
+    }
+    false
+}
+
 pub fn clear_session() {
-    let mut s = CURRENT_SESSION.lock().unwrap();
-    *s = None;
+    if let Ok(mut s) = CURRENT_SESSION.lock() {
+        *s = None;
+    }
 }
 
 pub fn require_session() -> Result<Session, String> {
     get_session().ok_or_else(|| "Session expired or not authenticated".to_string())
 }
 
+// ponytail: management always bypasses role checks — documented in guards.rs role matrix
 pub fn require_role(role: &str) -> Result<Session, String> {
     let session = require_session()?;
     if session.role != role && session.role != "management" {

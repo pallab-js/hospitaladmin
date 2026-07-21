@@ -45,16 +45,26 @@ pub struct DischargeRequest {
 #[tauri::command]
 pub async fn create_admission(request: CreateAdmissionRequest) -> Result<AdmissionWithDetails, String> {
     let session = guards::doctor_only()?;
+
+    if request.patient_id.trim().is_empty() {
+        return Err("Patient ID is required".to_string());
+    }
+    if request.bed_id.trim().is_empty() {
+        return Err("Bed ID is required".to_string());
+    }
+
     let pool = get_pool();
     let id = Uuid::new_v4().to_string();
-    let now = chrono::Utc::now();
+    let now = chrono::Local::now();
     let today = now.format("%Y-%m-%d").to_string();
     let time = now.format("%H:%M").to_string();
     let admission_type = request.admission_type.unwrap_or_else(|| "planned".to_string());
 
+    let mut tx = pool.begin().await.map_err(|_| "Failed to start transaction".to_string())?;
+
     let bed_status: String = sqlx::query_scalar("SELECT status FROM beds WHERE id = ?")
         .bind(&request.bed_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(|_| "Failed to check bed status".to_string())?
         .unwrap_or_default();
@@ -75,15 +85,17 @@ pub async fn create_admission(request: CreateAdmissionRequest) -> Result<Admissi
     .bind(&admission_type)
     .bind(&request.diagnosis)
     .bind(&request.treatment_notes)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|_| "Failed to create admission".to_string())?;
 
     sqlx::query("UPDATE beds SET status = 'occupied' WHERE id = ?")
         .bind(&request.bed_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .map_err(|_| "Failed to update bed status".to_string())?;
+
+    tx.commit().await.map_err(|_| "Failed to commit admission".to_string())?;
 
     log_audit(&session, "create", "admission", Some(&id), Some(&format!("patient={} bed={}", request.patient_id, request.bed_id))).await;
 
@@ -94,13 +106,15 @@ pub async fn create_admission(request: CreateAdmissionRequest) -> Result<Admissi
 pub async fn discharge_patient(request: DischargeRequest) -> Result<(), String> {
     let session = guards::doctor_only()?;
     let pool = get_pool();
-    let now = chrono::Utc::now();
+    let now = chrono::Local::now();
     let today = now.format("%Y-%m-%d").to_string();
     let time = now.format("%H:%M").to_string();
 
+    let mut tx = pool.begin().await.map_err(|_| "Failed to start transaction".to_string())?;
+
     let bed_id: String = sqlx::query_scalar("SELECT bed_id FROM admissions WHERE id = ?")
         .bind(&request.admission_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(|_| "Failed to retrieve admission".to_string())?
         .ok_or("Admission not found".to_string())?;
@@ -112,15 +126,17 @@ pub async fn discharge_patient(request: DischargeRequest) -> Result<(), String> 
     .bind(&time)
     .bind(&request.discharge_notes)
     .bind(&request.admission_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|_| "Failed to discharge patient".to_string())?;
 
     sqlx::query("UPDATE beds SET status = 'available' WHERE id = ?")
         .bind(&bed_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .map_err(|_| "Failed to update bed status".to_string())?;
+
+    tx.commit().await.map_err(|_| "Failed to commit discharge".to_string())?;
 
     log_audit(&session, "discharge", "admission", Some(&request.admission_id), None).await;
     Ok(())

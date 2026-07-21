@@ -1,3 +1,5 @@
+// Command modules: read commands in `<name>.rs`, write commands in `<name>_write.rs`.
+// Shared model types live in `models/`; command-local structs stay in the command file.
 pub mod patients;
 pub mod appointments;
 pub mod doctors;
@@ -12,3 +14,4 @@ pub mod reports;
 pub mod dashboard;
 pub mod prescriptions;
 pub mod admissions;
+pub mod database;

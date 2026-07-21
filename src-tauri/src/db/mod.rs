@@ -42,8 +42,47 @@ pub fn get_pool() -> &'static SqlitePool {
 }
 
 async fn run_migrations(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
-    sqlx::query(include_str!("../../migrations/001_initial.sql"))
-        .execute(pool)
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (
+            version TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )"
+    )
+    .execute(pool)
+    .await?;
+
+    let migrations_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("migrations");
+    if !migrations_dir.exists() {
+        return Ok(());
+    }
+
+    let mut entries: Vec<_> = std::fs::read_dir(&migrations_dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map(|ext| ext == "sql").unwrap_or(false))
+        .collect();
+    entries.sort_by_key(|e| e.file_name());
+
+    let applied: Vec<String> = sqlx::query_scalar("SELECT version FROM schema_migrations")
+        .fetch_all(pool)
         .await?;
+
+    for entry in entries {
+        let path = entry.path();
+        let filename = path.file_name().unwrap().to_string_lossy().to_string();
+        if applied.contains(&filename) {
+            continue;
+        }
+
+        let sql = std::fs::read_to_string(&path)?;
+        let mut tx = pool.begin().await?;
+        sqlx::query(&sql).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO schema_migrations (version) VALUES (?)")
+            .bind(&filename)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        println!("[migration] applied {}", filename);
+    }
+
     Ok(())
 }

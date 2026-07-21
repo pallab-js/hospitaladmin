@@ -8,7 +8,7 @@ pub async fn log_audit(
     entity_id: Option<&str>,
     details: Option<&str>,
 ) {
-    let _ = sqlx::query(
+    if let Err(e) = sqlx::query(
         "INSERT INTO audit_log (user_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)"
     )
     .bind(&session.user_id)
@@ -17,5 +17,8 @@ pub async fn log_audit(
     .bind(entity_id)
     .bind(details)
     .execute(get_pool())
-    .await;
+    .await
+    {
+        eprintln!("[audit] FAILED to write audit log: {} (action={}, entity={})", e, action, entity_type);
+    }
 }

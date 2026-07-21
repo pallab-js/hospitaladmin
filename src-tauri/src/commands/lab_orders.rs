@@ -40,10 +40,20 @@ pub struct UpdateLabResultRequest {
 #[tauri::command]
 pub async fn create_lab_order(request: CreateLabOrderRequest) -> Result<String, String> {
     let session = guards::doctor_only()?;
+
+    if request.patient_id.trim().is_empty() {
+        return Err("Patient ID is required".to_string());
+    }
+    if request.test_ids.is_empty() {
+        return Err("At least one test must be selected".to_string());
+    }
+
     let pool = get_pool();
     let id = Uuid::new_v4().to_string();
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let priority = request.priority.unwrap_or_else(|| "normal".to_string());
+
+    let mut tx = pool.begin().await.map_err(|_| "Failed to start transaction".to_string())?;
 
     sqlx::query(
         "INSERT INTO lab_orders (id, appointment_id, patient_id, doctor_id, order_date, priority, notes) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -55,7 +65,7 @@ pub async fn create_lab_order(request: CreateLabOrderRequest) -> Result<String, 
     .bind(&today)
     .bind(&priority)
     .bind(&request.notes)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|_| "Failed to create lab order".to_string())?;
 
@@ -67,10 +77,12 @@ pub async fn create_lab_order(request: CreateLabOrderRequest) -> Result<String, 
         .bind(&item_id)
         .bind(&id)
         .bind(test_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .map_err(|_| "Failed to add lab order item".to_string())?;
     }
+
+    tx.commit().await.map_err(|_| "Failed to commit lab order".to_string())?;
 
     log_audit(&session, "create", "lab_order", Some(&id), Some(&format!("patient={}", request.patient_id))).await;
     Ok(id)

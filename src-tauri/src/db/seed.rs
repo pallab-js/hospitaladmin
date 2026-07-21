@@ -20,6 +20,12 @@ pub async fn seed(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
     seed_lab_tests(pool).await?;
     seed_sample_patients(pool).await?;
 
+    // Initialize counters to match seeded data
+    sqlx::query("UPDATE counters SET current_value = (SELECT COUNT(*) FROM patients) WHERE name = 'patient_uid'")
+        .execute(pool).await?;
+    sqlx::query("UPDATE counters SET current_value = (SELECT COUNT(*) FROM invoices) WHERE name = 'invoice_number'")
+        .execute(pool).await?;
+
     println!("[seed] Database seeded successfully!");
     Ok(())
 }
@@ -102,6 +108,17 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
     .execute(pool)
     .await?;
 
+    // Create a canonical doctor user (matches README credentials)
+    let doc_user_id = Uuid::new_v4().to_string();
+    sqlx::query(
+        "INSERT INTO users (id, username, password_hash, role, is_active) VALUES (?, ?, ?, 'doctor', 1)"
+    )
+    .bind(&doc_user_id)
+    .bind("doctor")
+    .bind(&password_hash)
+    .execute(pool)
+    .await?;
+
     // Create user accounts for doctors
     let doctors = sqlx::query("SELECT id, first_name, last_name FROM staff WHERE role = 'doctor'")
         .fetch_all(pool)
@@ -111,7 +128,15 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
         let user_id = Uuid::new_v4().to_string();
         let first_name: String = doc.get("first_name");
         let last_name: String = doc.get("last_name");
-        let username = format!("{}{}", first_name.to_lowercase(), last_name.to_lowercase().chars().next().unwrap_or('x'));
+        let mut username = format!("{}{}", first_name.to_lowercase(), last_name.to_lowercase().chars().next().unwrap_or('x'));
+
+        // Collision handling: append numeric suffix
+        let mut suffix = 1;
+        while username_exists(pool, &username).await? {
+            username = format!("{}{}", format!("{}{}", first_name.to_lowercase(), last_name.to_lowercase().chars().next().unwrap_or('x')), suffix);
+            suffix += 1;
+        }
+
         let hash = bcrypt::hash("doctor123", 12)?;
 
         sqlx::query(
@@ -134,7 +159,14 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
         let user_id = Uuid::new_v4().to_string();
         let first_name: String = s.get("first_name");
         let last_name: String = s.get("last_name");
-        let username = format!("{}{}", first_name.to_lowercase(), last_name.to_lowercase().chars().next().unwrap_or('x'));
+        let mut username = format!("{}{}", first_name.to_lowercase(), last_name.to_lowercase().chars().next().unwrap_or('x'));
+
+        let mut suffix = 1;
+        while username_exists(pool, &username).await? {
+            username = format!("{}{}", format!("{}{}", first_name.to_lowercase(), last_name.to_lowercase().chars().next().unwrap_or('x')), suffix);
+            suffix += 1;
+        }
+
         let hash = bcrypt::hash("staff123", 12)?;
 
         sqlx::query(
@@ -149,6 +181,14 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
     }
 
     Ok(())
+}
+
+async fn username_exists(pool: &SqlitePool, username: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE username = ?")
+        .bind(username)
+        .fetch_one(pool)
+        .await?;
+    Ok(count > 0)
 }
 
 async fn seed_wards_and_beds(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {

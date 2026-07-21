@@ -3,6 +3,7 @@ use sqlx::Row;
 use crate::db::get_pool;
 use crate::auth::guards;
 use crate::utils::audit::log_audit;
+use crate::utils::id::generate_invoice_number;
 
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct InvoiceWithPatient {
@@ -50,38 +51,25 @@ pub struct RecordPaymentRequest {
     pub reference_number: Option<String>,
 }
 
-async fn generate_invoice_number() -> Result<String, String> {
-    let pool = get_pool();
-    let max_num: Option<String> = sqlx::query_scalar("SELECT MAX(invoice_number) FROM invoices")
-        .fetch_optional(pool)
-        .await
-        .map_err(|_| "Failed to generate invoice number".to_string())?;
-
-    let next = match max_num {
-        Some(num) => {
-            let n: i64 = num.strip_prefix("INV-")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0);
-            n + 1
-        }
-        None => 1,
-    };
-    Ok(format!("INV-{:06}", next))
-}
-
 #[tauri::command]
 pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWithPatient, String> {
     let session = guards::authenticated()?;
     let pool = get_pool();
     let id = Uuid::new_v4().to_string();
     let invoice_number = generate_invoice_number().await?;
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
 
     let subtotal: f64 = request.items.iter().map(|i| i.unit_price * (i.quantity.unwrap_or(1) as f64)).sum();
     let tax_rate = request.tax_rate.unwrap_or(0.1);
     let tax = subtotal * tax_rate;
     let discount = request.discount.unwrap_or(0.0);
     let total = subtotal + tax - discount;
+
+    if total < 0.0 {
+        return Err("Invoice total cannot be negative".to_string());
+    }
+
+    let mut tx = pool.begin().await.map_err(|_| "Failed to start transaction".to_string())?;
 
     sqlx::query(
         "INSERT INTO invoices (id, invoice_number, patient_id, admission_id, invoice_date, subtotal, tax, discount, total, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -96,7 +84,7 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
     .bind(discount)
     .bind(total)
     .bind(&request.notes)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|_| "Failed to create invoice".to_string())?;
 
@@ -114,10 +102,12 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
         .bind(item.unit_price)
         .bind(item_total)
         .bind(&item.reference_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .map_err(|_| "Failed to add invoice item".to_string())?;
     }
+
+    tx.commit().await.map_err(|_| "Failed to commit invoice".to_string())?;
 
     log_audit(&session, "create", "invoice", Some(&id), Some(&format!("patient={} total={}", request.patient_id, total))).await;
 
@@ -129,7 +119,7 @@ pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String>
     let session = guards::authenticated()?;
     let pool = get_pool();
     let id = Uuid::new_v4().to_string();
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
 
     let valid_methods = ["cash", "card", "insurance", "upi", "other"];
     if !valid_methods.contains(&request.payment_method.as_str()) {
@@ -138,6 +128,8 @@ pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String>
     if request.amount <= 0.0 {
         return Err("Payment amount must be positive".to_string());
     }
+
+    let mut tx = pool.begin().await.map_err(|_| "Failed to start transaction".to_string())?;
 
     sqlx::query(
         "INSERT INTO payments (id, invoice_id, amount, payment_method, payment_date, reference_number, received_by) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -149,21 +141,21 @@ pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String>
     .bind(&today)
     .bind(&request.reference_number)
     .bind(&session.user_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .map_err(|_| "Failed to record payment".to_string())?;
 
     let total_paid: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE invoice_id = ?")
         .bind(&request.invoice_id)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await
-        .unwrap_or(0.0);
+        .map_err(|_| "Failed to calculate total paid".to_string())?;
 
     let invoice_total: f64 = sqlx::query_scalar("SELECT total FROM invoices WHERE id = ?")
         .bind(&request.invoice_id)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await
-        .unwrap_or(0.0);
+        .map_err(|_| "Failed to retrieve invoice total".to_string())?;
 
     let new_status = if total_paid >= invoice_total {
         "paid"
@@ -176,9 +168,11 @@ pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String>
     sqlx::query("UPDATE invoices SET status = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(new_status)
         .bind(&request.invoice_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .map_err(|_| "Failed to update invoice status".to_string())?;
+
+    tx.commit().await.map_err(|_| "Failed to commit payment".to_string())?;
 
     log_audit(&session, "record_payment", "payment", Some(&id), Some(&format!("invoice={} amount={}", request.invoice_id, request.amount))).await;
     Ok(())

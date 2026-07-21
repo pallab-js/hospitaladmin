@@ -4,25 +4,7 @@ use crate::db::get_pool;
 use crate::models::patient::{CreatePatientRequest, Patient, PatientSearchParams};
 use crate::auth::guards;
 use crate::utils::audit::log_audit;
-
-async fn generate_patient_uid() -> Result<String, String> {
-    let pool = get_pool();
-    let max_uid: Option<String> = sqlx::query_scalar("SELECT MAX(patient_uid) FROM patients")
-        .fetch_optional(pool)
-        .await
-        .map_err(|_| "Failed to generate patient ID".to_string())?;
-
-    let next = match max_uid {
-        Some(uid) => {
-            let num: i64 = uid.strip_prefix("HMS-")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0);
-            num + 1
-        }
-        None => 1,
-    };
-    Ok(format!("HMS-{:05}", next))
-}
+use crate::utils::id::generate_patient_uid;
 
 #[tauri::command]
 pub async fn create_patient(request: CreatePatientRequest) -> Result<Patient, String> {
