@@ -1,0 +1,14 @@
+pub mod patients;
+pub mod appointments;
+pub mod doctors;
+pub mod beds;
+pub mod pharmacy;
+pub mod lab;
+pub mod lab_orders;
+pub mod billing;
+pub mod billing_write;
+pub mod staff;
+pub mod reports;
+pub mod dashboard;
+pub mod prescriptions;
+pub mod admissions;

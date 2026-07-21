@@ -1,0 +1,58 @@
+schema: spec-driven
+
+context: |
+  Project: Hospital Management System (HMS) - Desktop app for private hospital LAN
+  Tech stack:
+    - Frontend: SvelteKit 2, Svelte 5 (runes), TypeScript 5, TailwindCSS 4
+    - Desktop: Tauri v2 (Rust backend)
+    - UI: shadcn-svelte (Svelte 5 native, copy-paste components)
+    - Charts: Chart.js + svelte-chartjs
+    - Icons: @lucide/svelte
+    - Database: SQLite (embedded, WAL mode) via sqlx (Rust)
+    - Auth: bcrypt + session token (local, no external deps)
+    - Forms: Superforms + Zod validation
+
+  Architecture:
+    - Tauri v2 desktop shell with SvelteKit frontend (adapter-static)
+    - Rust backend handles all DB operations via Tauri IPC commands
+    - SvelteKit frontend calls Rust commands via @tauri-apps/api invoke()
+    - Three user roles: doctor, management, staff
+    - 10 modules: Patients, Appointments, Wards/Beds, Lab, Pharmacy, Billing, Staff, Dashboard, Reports, Settings
+
+  Design system:
+    - Primary: Medical Teal (#0f766e / oklch)
+    - Font: Inter
+    - shadcn-svelte components with custom hospital theme CSS variables
+    - Dark mode support via mode-watcher
+
+  Conventions:
+    - Rust: modules in src-tauri/src/{db,auth,commands,models,utils}
+    - Frontend: routes in src/routes/(module)/+page.svelte
+    - Components: src/lib/components/{ui,domain,layout,charts}
+    - Types: src/lib/lib/types.ts
+    - API wrapper: src/lib/lib/api.ts
+    - Stores: src/lib/stores/{auth,sidebar,notifications}.ts
+
+  Domain:
+    - Small hospital (<50 beds)
+    - Private network only (no internet dependency)
+    - Patient UID format: HMS-XXXXX
+    - Invoice format: INV-XXXXXX
+
+rules:
+  proposal:
+    - Include which of the 10 modules are affected
+    - Identify which user roles (doctor/management/staff) are impacted
+    - Note any database schema changes needed
+  specs:
+    - Use Given/When/Then format for scenarios
+    - Cover all three user roles where applicable
+    - Include error/edge cases
+  design:
+    - Reference shadcn-svelte components by name
+    - Include Rust command signatures for Tauri IPC
+    - Note SQLite query patterns and indexes
+  tasks:
+    - Break into: database -> Rust backend -> SvelteKit frontend
+    - Each task should be completable in one session
+    - Include verification step (pnpm check)
