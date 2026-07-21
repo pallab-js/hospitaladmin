@@ -29,10 +29,28 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     sqlx::query("PRAGMA journal_mode=WAL").execute(&pool).await?;
     sqlx::query("PRAGMA foreign_keys=ON").execute(&pool).await?;
 
-    run_migrations(&pool).await?;
-    seed::seed(&pool).await?;
-
-    DB_POOL.set(pool).expect("Database pool already initialized");
+    if let Err(e) = run_migrations(&pool).await {
+        eprintln!("[db] Migration failed: {}. Deleting stale database and retrying...", e);
+        drop(pool);
+        std::fs::remove_file(&db_path)?;
+        // Re-init with fresh DB
+        let options2 = SqliteConnectOptions::from_str(&db_url)?
+            .create_if_missing(true)
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+            .foreign_keys(true);
+        let pool2 = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect_with(options2)
+            .await?;
+        sqlx::query("PRAGMA journal_mode=WAL").execute(&pool2).await?;
+        sqlx::query("PRAGMA foreign_keys=ON").execute(&pool2).await?;
+        run_migrations(&pool2).await?;
+        seed::seed(&pool2).await?;
+        DB_POOL.set(pool2).expect("Database pool already initialized");
+    } else {
+        seed::seed(&pool).await?;
+        DB_POOL.set(pool).expect("Database pool already initialized");
+    }
 
     Ok(())
 }
