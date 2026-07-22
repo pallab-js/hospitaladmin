@@ -15,6 +15,7 @@ A modern, desktop-first hospital management system built with **Tauri 2**, **Sve
 - **Admissions** - Admit and discharge patients with bed assignment tracking
 - **Staff Management** - View staff directory with roles and department assignments
 - **Audit Logging** - Track all write operations for compliance
+- **Database Backup** - Export database snapshot for backup (management only)
 
 ## Tech Stack
 
@@ -74,22 +75,30 @@ hms/
 │   │   └── lib/            # API & types
 │   └── routes/             # Page routes
 ├── src-tauri/              # Rust backend
+│   ├── migrations/         # SQL migration files
+│   ├── capabilities/       # Tauri IPC permissions
 │   └── src/
 │       ├── auth/           # Authentication
 │       ├── commands/       # Tauri command handlers
 │       ├── models/         # Data models
-│       └── db/             # Database & migrations
+│       ├── db/             # Database & migrations
+│       └── utils/          # ID generators, audit, validation
 └── static/                 # Static assets
 ```
 
 ## Security
 
 - Content Security Policy (CSP) enabled
-- Auth guards on all API commands
+- Role-based auth guards on all commands (management/doctor/staff)
+- Login rate limiting (5 failed attempts → 15min lock, 20 → 24h lock)
+- Constant-time login responses (bcrypt dummy verify on invalid users)
 - bcrypt password hashing (cost factor 12)
-- Session expiry (1 hour)
+- Session expiry (1 hour) with activity refresh
+- Transactional multi-statement writes (no partial data)
+- Atomic ID generation (no race conditions on patient UID / invoice number)
 - Audit logging for all write operations
 - Input validation on backend and frontend
+- Multi-file migration system with version tracking
 
 ## License
 
