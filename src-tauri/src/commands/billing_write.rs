@@ -1,9 +1,8 @@
-use uuid::Uuid;
-use sqlx::Row;
-use crate::db::get_pool;
 use crate::auth::guards;
+use crate::db::get_pool;
 use crate::utils::audit::log_audit;
 use crate::utils::id::generate_invoice_number;
+use uuid::Uuid;
 
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct InvoiceWithPatient {
@@ -59,7 +58,11 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
     let invoice_number = generate_invoice_number().await?;
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
 
-    let subtotal: f64 = request.items.iter().map(|i| i.unit_price * (i.quantity.unwrap_or(1) as f64)).sum();
+    let subtotal: f64 = request
+        .items
+        .iter()
+        .map(|i| i.unit_price * (i.quantity.unwrap_or(1) as f64))
+        .sum();
     let tax_rate = request.tax_rate.unwrap_or(0.1);
     let tax = subtotal * tax_rate;
     let discount = request.discount.unwrap_or(0.0);
@@ -69,7 +72,10 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
         return Err("Invoice total cannot be negative".to_string());
     }
 
-    let mut tx = pool.begin().await.map_err(|_| "Failed to start transaction".to_string())?;
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|_| "Failed to start transaction".to_string())?;
 
     sqlx::query(
         "INSERT INTO invoices (id, invoice_number, patient_id, admission_id, invoice_date, subtotal, tax, discount, total, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -107,11 +113,30 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
         .map_err(|_| "Failed to add invoice item".to_string())?;
     }
 
-    tx.commit().await.map_err(|_| "Failed to commit invoice".to_string())?;
+    tx.commit()
+        .await
+        .map_err(|_| "Failed to commit invoice".to_string())?;
 
-    log_audit(&session, "create", "invoice", Some(&id), Some(&format!("patient={} total={}", request.patient_id, total))).await;
+    log_audit(
+        &session,
+        "create",
+        "invoice",
+        Some(&id),
+        Some(&format!("patient={} total={}", request.patient_id, total)),
+    )
+    .await;
 
-    get_invoice_with_patient(&id).await
+    sqlx::query_as::<_, InvoiceWithPatient>(
+        r#"SELECT i.*, p.first_name || ' ' || p.last_name as patient_name, p.patient_uid
+        FROM invoices i
+        JOIN patients p ON i.patient_id = p.id
+        WHERE i.id = ?"#,
+    )
+    .bind(&id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|_| "Failed to retrieve invoice".to_string())?
+    .ok_or("Invoice not found".to_string())
 }
 
 #[tauri::command]
@@ -129,7 +154,10 @@ pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String>
         return Err("Payment amount must be positive".to_string());
     }
 
-    let mut tx = pool.begin().await.map_err(|_| "Failed to start transaction".to_string())?;
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|_| "Failed to start transaction".to_string())?;
 
     sqlx::query(
         "INSERT INTO payments (id, invoice_id, amount, payment_method, payment_date, reference_number, received_by) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -145,11 +173,12 @@ pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String>
     .await
     .map_err(|_| "Failed to record payment".to_string())?;
 
-    let total_paid: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE invoice_id = ?")
-        .bind(&request.invoice_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|_| "Failed to calculate total paid".to_string())?;
+    let total_paid: f64 =
+        sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE invoice_id = ?")
+            .bind(&request.invoice_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|_| "Failed to calculate total paid".to_string())?;
 
     let invoice_total: f64 = sqlx::query_scalar("SELECT total FROM invoices WHERE id = ?")
         .bind(&request.invoice_id)
@@ -172,43 +201,20 @@ pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String>
         .await
         .map_err(|_| "Failed to update invoice status".to_string())?;
 
-    tx.commit().await.map_err(|_| "Failed to commit payment".to_string())?;
+    tx.commit()
+        .await
+        .map_err(|_| "Failed to commit payment".to_string())?;
 
-    log_audit(&session, "record_payment", "payment", Some(&id), Some(&format!("invoice={} amount={}", request.invoice_id, request.amount))).await;
-    Ok(())
-}
-
-async fn get_invoice_with_patient(id: &str) -> Result<InvoiceWithPatient, String> {
-    let pool = get_pool();
-    let row = sqlx::query(
-        r#"SELECT i.*, p.first_name || ' ' || p.last_name as patient_name, p.patient_uid
-        FROM invoices i
-        JOIN patients p ON i.patient_id = p.id
-        WHERE i.id = ?"#
+    log_audit(
+        &session,
+        "record_payment",
+        "payment",
+        Some(&id),
+        Some(&format!(
+            "invoice={} amount={}",
+            request.invoice_id, request.amount
+        )),
     )
-    .bind(id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|_| "Failed to retrieve invoice".to_string())?;
-
-    match row {
-        Some(r) => Ok(InvoiceWithPatient {
-            id: r.get("id"),
-            invoice_number: r.get("invoice_number"),
-            patient_id: r.get("patient_id"),
-            patient_name: r.get("patient_name"),
-            patient_uid: r.get("patient_uid"),
-            admission_id: r.get("admission_id"),
-            invoice_date: r.get("invoice_date"),
-            subtotal: r.get("subtotal"),
-            tax: r.get("tax"),
-            discount: r.get("discount"),
-            total: r.get("total"),
-            status: r.get("status"),
-            notes: r.get("notes"),
-            created_at: r.get("created_at"),
-            updated_at: r.get("updated_at"),
-        }),
-        None => Err("Invoice not found".to_string()),
-    }
+    .await;
+    Ok(())
 }

@@ -1,10 +1,9 @@
-use uuid::Uuid;
-use sqlx::Row;
+use crate::auth::guards;
 use crate::db::get_pool;
 use crate::models::patient::{CreatePatientRequest, Patient, PatientSearchParams};
-use crate::auth::guards;
 use crate::utils::audit::log_audit;
 use crate::utils::id::generate_patient_uid;
+use uuid::Uuid;
 
 #[tauri::command]
 pub async fn create_patient(request: CreatePatientRequest) -> Result<Patient, String> {
@@ -38,52 +37,39 @@ pub async fn create_patient(request: CreatePatientRequest) -> Result<Patient, St
     .await
     .map_err(|_| "Failed to create patient record".to_string())?;
 
-    log_audit(&session, "create", "patient", Some(&id), Some(&format!("{} {}", request.first_name, request.last_name))).await;
+    log_audit(
+        &session,
+        "create",
+        "patient",
+        Some(&id),
+        Some(&format!("{} {}", request.first_name, request.last_name)),
+    )
+    .await;
 
-    get_patient_by_id(id).await
+    sqlx::query_as::<_, Patient>("SELECT * FROM patients WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|_| "Failed to retrieve patient".to_string())?
+        .ok_or("Patient not found".to_string())
 }
 
 #[tauri::command]
-pub async fn get_patients(
-    page: Option<i64>,
-    limit: Option<i64>,
-) -> Result<Vec<Patient>, String> {
+pub async fn get_patients(page: Option<i64>, limit: Option<i64>) -> Result<Vec<Patient>, String> {
     guards::authenticated()?;
     let pool = get_pool();
     let page = page.unwrap_or(1);
     let limit = limit.unwrap_or(20);
     let offset = (page - 1) * limit;
 
-    let rows = sqlx::query(
-        "SELECT * FROM patients WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    sqlx::query_as::<_, Patient>(
+        "SELECT * FROM patients WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?",
     )
     .bind(limit)
     .bind(offset)
     .fetch_all(pool)
     .await
-    .map_err(|_| "Failed to retrieve patients".to_string())?;
-
-    Ok(rows.iter().map(|r| Patient {
-        id: r.get("id"),
-        patient_uid: r.get("patient_uid"),
-        first_name: r.get("first_name"),
-        last_name: r.get("last_name"),
-        date_of_birth: r.get("date_of_birth"),
-        gender: r.get("gender"),
-        blood_group: r.get("blood_group"),
-        phone: r.get("phone"),
-        email: r.get("email"),
-        address: r.get("address"),
-        emergency_contact_name: r.get("emergency_contact_name"),
-        emergency_contact_phone: r.get("emergency_contact_phone"),
-        insurance_provider: r.get("insurance_provider"),
-        insurance_id: r.get("insurance_id"),
-        allergies: r.get("allergies"),
-        medical_history: r.get("medical_history"),
-        is_active: r.get::<i64, _>("is_active") == 1,
-        created_at: r.get("created_at"),
-        updated_at: r.get("updated_at"),
-    }).collect())
+    .map_err(|_| "Failed to retrieve patients".to_string())
 }
 
 #[tauri::command]
@@ -91,36 +77,12 @@ pub async fn get_patient_by_id(id: String) -> Result<Patient, String> {
     guards::authenticated()?;
     let pool = get_pool();
 
-    let row = sqlx::query("SELECT * FROM patients WHERE id = ?")
+    sqlx::query_as::<_, Patient>("SELECT * FROM patients WHERE id = ?")
         .bind(&id)
         .fetch_optional(pool)
         .await
-        .map_err(|_| "Failed to retrieve patient".to_string())?;
-
-    match row {
-        Some(r) => Ok(Patient {
-            id: r.get("id"),
-            patient_uid: r.get("patient_uid"),
-            first_name: r.get("first_name"),
-            last_name: r.get("last_name"),
-            date_of_birth: r.get("date_of_birth"),
-            gender: r.get("gender"),
-            blood_group: r.get("blood_group"),
-            phone: r.get("phone"),
-            email: r.get("email"),
-            address: r.get("address"),
-            emergency_contact_name: r.get("emergency_contact_name"),
-            emergency_contact_phone: r.get("emergency_contact_phone"),
-            insurance_provider: r.get("insurance_provider"),
-            insurance_id: r.get("insurance_id"),
-            allergies: r.get("allergies"),
-            medical_history: r.get("medical_history"),
-            is_active: r.get::<i64, _>("is_active") == 1,
-            created_at: r.get("created_at"),
-            updated_at: r.get("updated_at"),
-        }),
-        None => Err("Patient not found".to_string()),
-    }
+        .map_err(|_| "Failed to retrieve patient".to_string())?
+        .ok_or("Patient not found".to_string())
 }
 
 #[tauri::command]
@@ -131,9 +93,16 @@ pub async fn search_patients(params: PatientSearchParams) -> Result<Vec<Patient>
     let mut bind_values: Vec<String> = Vec::new();
 
     if let Some(ref q) = params.query {
-        query.push_str(" AND (first_name LIKE ? OR last_name LIKE ? OR patient_uid LIKE ? OR phone LIKE ?)");
+        query.push_str(
+            " AND (first_name LIKE ? OR last_name LIKE ? OR patient_uid LIKE ? OR phone LIKE ?)",
+        );
         let pattern = format!("%{}%", q);
-        bind_values.extend(vec![pattern.clone(), pattern.clone(), pattern.clone(), pattern]);
+        bind_values.extend(vec![
+            pattern.clone(),
+            pattern.clone(),
+            pattern.clone(),
+            pattern,
+        ]);
     }
 
     if let Some(ref gender) = params.gender {
@@ -152,35 +121,13 @@ pub async fn search_patients(params: PatientSearchParams) -> Result<Vec<Patient>
     let limit = params.limit.unwrap_or(20);
     let offset = (page - 1) * limit;
 
-    let mut sql = sqlx::query(&query);
+    let mut sql = sqlx::query_as::<_, Patient>(&query);
     for value in &bind_values {
         sql = sql.bind(value);
     }
     sql = sql.bind(limit).bind(offset);
 
-    let rows = sql.fetch_all(pool)
+    sql.fetch_all(pool)
         .await
-        .map_err(|_| "Failed to search patients".to_string())?;
-
-    Ok(rows.iter().map(|r| Patient {
-        id: r.get("id"),
-        patient_uid: r.get("patient_uid"),
-        first_name: r.get("first_name"),
-        last_name: r.get("last_name"),
-        date_of_birth: r.get("date_of_birth"),
-        gender: r.get("gender"),
-        blood_group: r.get("blood_group"),
-        phone: r.get("phone"),
-        email: r.get("email"),
-        address: r.get("address"),
-        emergency_contact_name: r.get("emergency_contact_name"),
-        emergency_contact_phone: r.get("emergency_contact_phone"),
-        insurance_provider: r.get("insurance_provider"),
-        insurance_id: r.get("insurance_id"),
-        allergies: r.get("allergies"),
-        medical_history: r.get("medical_history"),
-        is_active: r.get::<i64, _>("is_active") == 1,
-        created_at: r.get("created_at"),
-        updated_at: r.get("updated_at"),
-    }).collect())
+        .map_err(|_| "Failed to search patients".to_string())
 }

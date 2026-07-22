@@ -32,18 +32,3 @@ pub struct MonthlyTrend {
     pub revenue: f64,
     pub admissions: i64,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DoctorDashboard {
-    pub today_appointments: i64,
-    pub pending_lab_results: i64,
-    pub active_patients: i64,
-    pub recent_appointments: Vec<super::appointment::AppointmentWithDetails>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct StaffDashboard {
-    pub ward_status: Vec<super::bed::WardOccupancy>,
-    pub pending_tasks: i64,
-    pub today_appointments: i64,
-}

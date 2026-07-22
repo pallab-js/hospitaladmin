@@ -1,22 +1,12 @@
-use crate::db;
 use crate::auth::guards;
-
-#[derive(serde::Serialize, sqlx::FromRow)]
-pub struct WardOccupancy {
-    pub ward_id: String,
-    pub ward_name: String,
-    pub total_beds: i64,
-    pub occupied: i64,
-    pub available: i64,
-    pub reserved: i64,
-    pub occupancy_rate: f64,
-}
+use crate::db;
+use crate::models::bed::WardOccupancy;
 
 #[tauri::command]
 pub async fn get_ward_occupancy() -> Result<Vec<WardOccupancy>, String> {
     guards::authenticated()?;
     let pool = db::get_pool();
-    let rows = sqlx::query_as::<_, WardOccupancy>(
+    sqlx::query_as::<_, WardOccupancy>(
         r#"
         SELECT
             w.id as ward_id,
@@ -35,6 +25,5 @@ pub async fn get_ward_occupancy() -> Result<Vec<WardOccupancy>, String> {
     )
     .fetch_all(pool)
     .await
-    .map_err(|_| "Failed to retrieve ward data".to_string())?;
-    Ok(rows)
+    .map_err(|_| "Failed to retrieve ward data".to_string())
 }

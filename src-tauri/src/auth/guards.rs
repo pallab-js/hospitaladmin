@@ -1,4 +1,4 @@
-use super::session::{require_session, require_role, refresh_session, Session};
+use super::session::{refresh_session, require_role, require_session, Session};
 
 // Role matrix (management bypasses all checks):
 // | Capability              | doctor | staff | management |
@@ -33,15 +33,6 @@ pub fn doctor_only() -> Result<Session, String> {
 
 pub fn management_only() -> Result<Session, String> {
     let session = require_role("management")?;
-    refresh_session();
-    Ok(session)
-}
-
-pub fn non_doctor_only() -> Result<Session, String> {
-    let session = require_session()?;
-    if session.role == "doctor" {
-        return Err("Staff access required".to_string());
-    }
     refresh_session();
     Ok(session)
 }

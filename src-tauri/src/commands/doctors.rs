@@ -1,5 +1,5 @@
-use crate::db;
 use crate::auth::guards;
+use crate::db;
 
 #[derive(serde::Serialize, sqlx::FromRow)]
 pub struct DoctorInfo {

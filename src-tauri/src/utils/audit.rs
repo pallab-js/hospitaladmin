@@ -1,5 +1,5 @@
-use crate::db::get_pool;
 use crate::auth::session::Session;
+use crate::db::get_pool;
 
 pub async fn log_audit(
     session: &Session,

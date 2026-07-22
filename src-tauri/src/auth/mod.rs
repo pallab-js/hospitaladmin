@@ -1,3 +1,3 @@
 pub mod commands;
-pub mod session;
 pub mod guards;
+pub mod session;

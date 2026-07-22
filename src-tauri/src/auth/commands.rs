@@ -1,7 +1,7 @@
+use super::session::{clear_session, get_session, set_session, Session};
+use crate::db::get_pool;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
-use crate::db::get_pool;
-use super::session::{set_session, clear_session, get_session, Session};
 
 const MAX_FAILED_ATTEMPTS: i64 = 5;
 const LOCKOUT_MINUTES: i64 = 15;
@@ -49,7 +49,9 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
         Some(row) => {
             let locked_until: Option<String> = row.get("locked_until");
             if let Some(ref lock_time) = locked_until {
-                if let Ok(lock_dt) = chrono::NaiveDateTime::parse_from_str(lock_time, "%Y-%m-%d %H:%M:%S") {
+                if let Ok(lock_dt) =
+                    chrono::NaiveDateTime::parse_from_str(lock_time, "%Y-%m-%d %H:%M:%S")
+                {
                     if chrono::Local::now().naive_local() < lock_dt {
                         return Ok(LoginResponse {
                             success: false,
@@ -71,11 +73,13 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                 let employee_id: Option<String> = row.get("employee_id");
 
                 // Reset failed attempts on success
-                sqlx::query("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
-                    .bind(&user_id)
-                    .execute(pool)
-                    .await
-                    .ok();
+                sqlx::query(
+                    "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?",
+                )
+                .bind(&user_id)
+                .execute(pool)
+                .await
+                .ok();
 
                 let full_name = if let Some(ref emp_id) = employee_id {
                     sqlx::query("SELECT first_name, last_name FROM staff WHERE id = ?")
@@ -124,9 +128,17 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                 let new_count = failed_attempts + 1;
 
                 let lock_until = if new_count >= HARD_LOCKOUT_THRESHOLD {
-                    Some((chrono::Local::now() + chrono::Duration::minutes(HARD_LOCKOUT_MINUTES)).format("%Y-%m-%d %H:%M:%S").to_string())
+                    Some(
+                        (chrono::Local::now() + chrono::Duration::minutes(HARD_LOCKOUT_MINUTES))
+                            .format("%Y-%m-%d %H:%M:%S")
+                            .to_string(),
+                    )
                 } else if new_count >= MAX_FAILED_ATTEMPTS {
-                    Some((chrono::Local::now() + chrono::Duration::minutes(LOCKOUT_MINUTES)).format("%Y-%m-%d %H:%M:%S").to_string())
+                    Some(
+                        (chrono::Local::now() + chrono::Duration::minutes(LOCKOUT_MINUTES))
+                            .format("%Y-%m-%d %H:%M:%S")
+                            .to_string(),
+                    )
                 } else {
                     None
                 };
@@ -142,12 +154,19 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                 // Log failed attempt
                 if let Some(ref user_id_val) = row.get::<Option<String>, _>("id") {
                     crate::utils::audit::log_audit(
-                        &Session { user_id: user_id_val.clone(), username: request.username.clone(), role: String::new(), employee_id: None, created_at: 0 },
+                        &Session {
+                            user_id: user_id_val.clone(),
+                            username: request.username.clone(),
+                            role: String::new(),
+                            employee_id: None,
+                            created_at: 0,
+                        },
                         "login_failed",
                         "user",
                         Some(user_id_val),
                         Some(&format!("attempts={}", new_count)),
-                    ).await;
+                    )
+                    .await;
                 }
 
                 Ok(LoginResponse {

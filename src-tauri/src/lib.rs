@@ -1,6 +1,6 @@
-mod db;
 mod auth;
 mod commands;
+mod db;
 mod models;
 mod utils;
 
@@ -11,7 +11,9 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
-                db::init(&app_handle).await.expect("Failed to initialize database");
+                db::init(&app_handle)
+                    .await
+                    .expect("Failed to initialize database");
             });
             Ok(())
         })

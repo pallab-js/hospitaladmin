@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct Appointment {
     pub id: String,
     pub patient_id: String,
@@ -50,7 +50,7 @@ impl CreateAppointmentRequest {
             return Err("Appointment time must be in HH:MM format".to_string());
         }
         if let Some(dur) = self.duration_minutes {
-            if dur < 5 || dur > 480 {
+            if !(5..=480).contains(&dur) {
                 return Err("Duration must be between 5 and 480 minutes".to_string());
             }
         }

@@ -1,50 +1,80 @@
-use sqlx::Row;
+use crate::auth::guards;
 use crate::db::get_pool;
 use crate::models::dashboard::*;
-use crate::auth::guards;
+use sqlx::Row;
 
-async fn count_appointments_today(pool: &sqlx::SqlitePool, date: &str, doctor_id: Option<&str>) -> Result<(i64, i64), String> {
+async fn count_appointments_today(
+    pool: &sqlx::SqlitePool,
+    date: &str,
+    doctor_id: Option<&str>,
+) -> Result<(i64, i64), String> {
     let (distinct_patients, total) = if let Some(doc_id) = doctor_id {
         let p: i64 = sqlx::query_scalar(
             "SELECT COUNT(DISTINCT patient_id) FROM appointments WHERE appointment_date = ? AND doctor_id = ?"
         )
         .bind(date).bind(doc_id).fetch_one(pool).await.unwrap_or(0);
         let a: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM appointments WHERE appointment_date = ? AND doctor_id = ?"
+            "SELECT COUNT(*) FROM appointments WHERE appointment_date = ? AND doctor_id = ?",
         )
-        .bind(date).bind(doc_id).fetch_one(pool).await.unwrap_or(0);
+        .bind(date)
+        .bind(doc_id)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
         (p, a)
     } else {
         let p: i64 = sqlx::query_scalar(
-            "SELECT COUNT(DISTINCT patient_id) FROM appointments WHERE appointment_date = ?"
+            "SELECT COUNT(DISTINCT patient_id) FROM appointments WHERE appointment_date = ?",
         )
-        .bind(date).fetch_one(pool).await.unwrap_or(0);
-        let a: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM appointments WHERE appointment_date = ?"
-        )
-        .bind(date).fetch_one(pool).await.unwrap_or(0);
+        .bind(date)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+        let a: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM appointments WHERE appointment_date = ?")
+                .bind(date)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0);
         (p, a)
     };
     Ok((distinct_patients, total))
 }
 
-async fn count_pending_lab_orders(pool: &sqlx::SqlitePool, doctor_id: Option<&str>) -> Result<i64, String> {
+async fn count_pending_lab_orders(
+    pool: &sqlx::SqlitePool,
+    doctor_id: Option<&str>,
+) -> Result<i64, String> {
     if let Some(doc_id) = doctor_id {
         sqlx::query_scalar("SELECT COUNT(*) FROM lab_orders WHERE status IN ('ordered', 'in_progress') AND doctor_id = ?")
             .bind(doc_id).fetch_one(pool).await.map_err(|e| e.to_string())
     } else {
-        sqlx::query_scalar("SELECT COUNT(*) FROM lab_orders WHERE status IN ('ordered', 'in_progress')")
-            .fetch_one(pool).await.map_err(|e| e.to_string())
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM lab_orders WHERE status IN ('ordered', 'in_progress')",
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(|e| e.to_string())
     }
 }
 
-async fn count_active_admissions(pool: &sqlx::SqlitePool, doctor_id: Option<&str>) -> Result<i64, String> {
+async fn count_active_admissions(
+    pool: &sqlx::SqlitePool,
+    doctor_id: Option<&str>,
+) -> Result<i64, String> {
     if let Some(doc_id) = doctor_id {
-        sqlx::query_scalar("SELECT COUNT(*) FROM admissions WHERE status = 'active' AND doctor_id = ?")
-            .bind(doc_id).fetch_one(pool).await.map_err(|e| e.to_string())
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM admissions WHERE status = 'active' AND doctor_id = ?",
+        )
+        .bind(doc_id)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| e.to_string())
     } else {
         sqlx::query_scalar("SELECT COUNT(*) FROM admissions WHERE status = 'active'")
-            .fetch_one(pool).await.map_err(|e| e.to_string())
+            .fetch_one(pool)
+            .await
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -57,31 +87,46 @@ pub async fn get_dashboard_stats() -> Result<DashboardStats, String> {
     let month_start = chrono::Local::now().format("%Y-%m-01").to_string();
     let doctor_id = session.employee_id.as_deref();
 
-    let (total_patients_today, total_appointments_today) = count_appointments_today(pool, &today, doctor_id).await?;
+    let (total_patients_today, total_appointments_today) =
+        count_appointments_today(pool, &today, doctor_id).await?;
     let pending_lab_orders = count_pending_lab_orders(pool, doctor_id).await?;
     let active_admissions = count_active_admissions(pool, doctor_id).await?;
 
     let total_beds: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM beds")
-        .fetch_one(pool).await.unwrap_or(1);
-    let occupied_beds: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM beds WHERE status = 'occupied'")
-        .fetch_one(pool).await.unwrap_or(0);
+        .fetch_one(pool)
+        .await
+        .unwrap_or(1);
+    let occupied_beds: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM beds WHERE status = 'occupied'")
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
     let bed_occupancy_rate = (occupied_beds as f64 / total_beds as f64) * 100.0;
 
     let revenue_today: f64 = if session.role == "management" {
         sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date = ?")
-            .bind(&today).fetch_one(pool).await
+            .bind(&today)
+            .fetch_one(pool)
+            .await
             .map_err(|e| format!("Failed to query revenue: {}", e))?
     } else {
         0.0
     };
 
     let staff_on_duty: i64 = sqlx::query_scalar(
-        "SELECT COUNT(DISTINCT staff_id) FROM attendance WHERE date = ? AND status = 'present'"
-    ).bind(&today).fetch_one(pool).await.unwrap_or(0);
+        "SELECT COUNT(DISTINCT staff_id) FROM attendance WHERE date = ? AND status = 'present'",
+    )
+    .bind(&today)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
 
-    let patients_registered_this_month: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM patients WHERE created_at >= ?"
-    ).bind(&month_start).fetch_one(pool).await.unwrap_or(0);
+    let patients_registered_this_month: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM patients WHERE created_at >= ?")
+            .bind(&month_start)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
 
     Ok(DashboardStats {
         total_patients_today,
@@ -106,17 +151,20 @@ pub async fn get_revenue_chart(days: Option<i64>) -> Result<Vec<RevenueData>, St
         FROM payments
         WHERE payment_date >= date('now', '-' || ? || ' days')
         GROUP BY payment_date
-        ORDER BY payment_date ASC"#
+        ORDER BY payment_date ASC"#,
     )
     .bind(days)
     .fetch_all(pool)
     .await
     .map_err(|_| "Failed to retrieve revenue data".to_string())?;
 
-    Ok(rows.iter().map(|r| RevenueData {
-        date: r.get("date"),
-        amount: r.get("amount"),
-    }).collect())
+    Ok(rows
+        .iter()
+        .map(|r| RevenueData {
+            date: r.get("date"),
+            amount: r.get("amount"),
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -134,18 +182,21 @@ pub async fn get_department_load() -> Result<Vec<DepartmentLoad>, String> {
         LEFT JOIN patients p ON a.patient_id = p.id
         WHERE d.is_active = 1
         GROUP BY d.id, d.name
-        ORDER BY appointment_count DESC"#
+        ORDER BY appointment_count DESC"#,
     )
     .bind(&today)
     .fetch_all(pool)
     .await
     .map_err(|_| "Failed to retrieve department load".to_string())?;
 
-    Ok(rows.iter().map(|r| DepartmentLoad {
-        department_name: r.get("department_name"),
-        appointment_count: r.get("appointment_count"),
-        patient_count: r.get("patient_count"),
-    }).collect())
+    Ok(rows
+        .iter()
+        .map(|r| DepartmentLoad {
+            department_name: r.get("department_name"),
+            appointment_count: r.get("appointment_count"),
+            patient_count: r.get("patient_count"),
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -163,17 +214,20 @@ pub async fn get_monthly_trends(months: Option<i64>) -> Result<Vec<MonthlyTrend>
         FROM patients
         WHERE created_at >= date('now', '-' || ? || ' months')
         GROUP BY strftime('%Y-%m', created_at)
-        ORDER BY month ASC"#
+        ORDER BY month ASC"#,
     )
     .bind(months)
     .fetch_all(pool)
     .await
     .map_err(|_| "Failed to retrieve monthly trends".to_string())?;
 
-    Ok(rows.iter().map(|r| MonthlyTrend {
-        month: r.get("month"),
-        patients: r.get("patients"),
-        revenue: r.get("revenue"),
-        admissions: r.get("admissions"),
-    }).collect())
+    Ok(rows
+        .iter()
+        .map(|r| MonthlyTrend {
+            month: r.get("month"),
+            patients: r.get("patients"),
+            revenue: r.get("revenue"),
+            admissions: r.get("admissions"),
+        })
+        .collect())
 }

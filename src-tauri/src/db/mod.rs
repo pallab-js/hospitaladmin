@@ -10,7 +10,10 @@ use tauri::Manager;
 static DB_POOL: OnceLock<SqlitePool> = OnceLock::new();
 
 pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let app_dir = app.path().app_data_dir().expect("Failed to get app data dir");
+    let app_dir = app
+        .path()
+        .app_data_dir()
+        .expect("Failed to get app data dir");
     std::fs::create_dir_all(&app_dir)?;
 
     let db_path = app_dir.join("hms.db");
@@ -26,11 +29,16 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .connect_with(options)
         .await?;
 
-    sqlx::query("PRAGMA journal_mode=WAL").execute(&pool).await?;
+    sqlx::query("PRAGMA journal_mode=WAL")
+        .execute(&pool)
+        .await?;
     sqlx::query("PRAGMA foreign_keys=ON").execute(&pool).await?;
 
     if let Err(e) = run_migrations(&pool).await {
-        eprintln!("[db] Migration failed: {}. Deleting stale database and retrying...", e);
+        eprintln!(
+            "[db] Migration failed: {}. Deleting stale database and retrying...",
+            e
+        );
         drop(pool);
         std::fs::remove_file(&db_path)?;
         // Re-init with fresh DB
@@ -42,14 +50,22 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             .max_connections(5)
             .connect_with(options2)
             .await?;
-        sqlx::query("PRAGMA journal_mode=WAL").execute(&pool2).await?;
-        sqlx::query("PRAGMA foreign_keys=ON").execute(&pool2).await?;
+        sqlx::query("PRAGMA journal_mode=WAL")
+            .execute(&pool2)
+            .await?;
+        sqlx::query("PRAGMA foreign_keys=ON")
+            .execute(&pool2)
+            .await?;
         run_migrations(&pool2).await?;
         seed::seed(&pool2).await?;
-        DB_POOL.set(pool2).expect("Database pool already initialized");
+        DB_POOL
+            .set(pool2)
+            .expect("Database pool already initialized");
     } else {
         seed::seed(&pool).await?;
-        DB_POOL.set(pool).expect("Database pool already initialized");
+        DB_POOL
+            .set(pool)
+            .expect("Database pool already initialized");
     }
 
     Ok(())
@@ -64,7 +80,7 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
         "CREATE TABLE IF NOT EXISTS schema_migrations (
             version TEXT PRIMARY KEY,
             applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )"
+        )",
     )
     .execute(pool)
     .await?;
@@ -76,7 +92,12 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
 
     let mut entries: Vec<_> = std::fs::read_dir(&migrations_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map(|ext| ext == "sql").unwrap_or(false))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map(|ext| ext == "sql")
+                .unwrap_or(false)
+        })
         .collect();
     entries.sort_by_key(|e| e.file_name());
 
