@@ -3,6 +3,7 @@
   import { page } from "$app/stores";
   import { createAppointment, getPatients, getDoctors } from "$lib/lib/api.js";
   import { notifications } from "$lib/stores/notifications.js";
+  import { appointmentSchema } from "$lib/lib/validation.js";
   import type { Patient } from "$lib/lib/types.js";
   import { onMount } from "svelte";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
@@ -20,13 +21,14 @@
   let patients = $state<Patient[]>([]);
   let doctors = $state<{ id: string; full_name: string; department_id: string | null }[]>([]);
   let loadingData = $state(true);
+  let formErrors = $state<Record<string, string>>({});
 
   let form = $state({
     patient_id: $page.url.searchParams.get("patient") || "",
     doctor_id: "",
     appointment_date: new Date().toISOString().slice(0, 10),
     appointment_time: "09:00",
-    visit_type: "consultation",
+    visit_type: "consultation" as const,
     reason: "",
   });
 
@@ -40,15 +42,25 @@
     }
   });
 
-  async function handleSubmit() {
-    if (!form.patient_id || !form.doctor_id || !form.appointment_date || !form.appointment_time) {
-      notifications.add({
-        type: "error",
-        title: "Validation Error",
-        message: "Please fill in all required fields",
-      });
-      return;
+  function validate(): boolean {
+    formErrors = {};
+    const result = appointmentSchema.safeParse({
+      ...form,
+      visit_type: form.visit_type || undefined,
+      reason: form.reason || undefined,
+    });
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const field = String(issue.path[0]);
+        formErrors[field] = issue.message;
+      }
+      return false;
     }
+    return true;
+  }
+
+  async function handleSubmit() {
+    if (!validate()) return;
 
     loading = true;
     try {
@@ -99,6 +111,9 @@
               <option value={p.id}>{p.first_name} {p.last_name} ({p.patient_uid})</option>
             {/each}
           </Select>
+          {#if formErrors.patient_id}
+            <p class="text-sm text-destructive">{formErrors.patient_id}</p>
+          {/if}
         </div>
 
         <div class="space-y-2">
@@ -109,16 +124,25 @@
               <option value={d.id}>{d.full_name}</option>
             {/each}
           </Select>
+          {#if formErrors.doctor_id}
+            <p class="text-sm text-destructive">{formErrors.doctor_id}</p>
+          {/if}
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="date">Date *</Label>
-            <Input id="date" type="date" bind:value={form.appointment_date} required />
+            <Input id="date" type="date" bind:value={form.appointment_date} />
+            {#if formErrors.appointment_date}
+              <p class="text-sm text-destructive">{formErrors.appointment_date}</p>
+            {/if}
           </div>
           <div class="space-y-2">
             <Label for="time">Time *</Label>
-            <Input id="time" type="time" bind:value={form.appointment_time} required />
+            <Input id="time" type="time" bind:value={form.appointment_time} />
+            {#if formErrors.appointment_time}
+              <p class="text-sm text-destructive">{formErrors.appointment_time}</p>
+            {/if}
           </div>
         </div>
 

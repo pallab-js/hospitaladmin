@@ -15,19 +15,21 @@
   let stock = $state<{ medication_id: string; quantity: number; low_threshold: number; expiry_date: string }[]>([]);
   let loading = $state(true);
   let search = $state("");
+  let stockMap = $state<Map<string, { quantity: number; low_threshold: number; expiry_date: string }>>(new Map());
 
   onMount(async () => {
     try {
       const [m, s] = await Promise.all([getMedications(), getMedicationStock()]);
       medications = m;
       stock = s;
+      stockMap = new Map(s.map((item) => [item.medication_id, item]));
     } finally {
       loading = false;
     }
   });
 
   function getStockQty(medId: string) {
-    return stock.find((s) => s.medication_id === medId);
+    return stockMap.get(medId);
   }
 
   const totalMedications = $derived(medications.length);

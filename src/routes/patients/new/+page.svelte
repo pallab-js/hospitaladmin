@@ -2,6 +2,8 @@
   import { goto } from "$app/navigation";
   import { createPatient } from "$lib/lib/api.js";
   import { notifications } from "$lib/stores/notifications.js";
+  import { patientSchema } from "$lib/lib/validation.js";
+  import type { PatientFormData } from "$lib/lib/validation.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
   import Button from "$lib/components/ui/button/index.svelte";
   import Input from "$lib/components/ui/input/index.svelte";
@@ -16,6 +18,7 @@
   import { ArrowLeft, Save } from "@lucide/svelte";
 
   let loading = $state(false);
+  let formErrors = $state<Record<string, string>>({});
   let form = $state({
     first_name: "",
     last_name: "",
@@ -33,15 +36,21 @@
     medical_history: "",
   });
 
-  async function handleSubmit() {
-    if (!form.first_name || !form.last_name || !form.date_of_birth) {
-      notifications.add({
-        type: "error",
-        title: "Validation Error",
-        message: "Please fill in all required fields",
-      });
-      return;
+  function validate(): boolean {
+    formErrors = {};
+    const result = patientSchema.safeParse(form);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const field = String(issue.path[0]);
+        formErrors[field] = issue.message;
+      }
+      return false;
     }
+    return true;
+  }
+
+  async function handleSubmit() {
+    if (!validate()) return;
 
     loading = true;
     try {
@@ -85,17 +94,26 @@
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label for="first_name">First Name *</Label>
-              <Input id="first_name" bind:value={form.first_name} placeholder="Enter first name" required />
+              <Input id="first_name" bind:value={form.first_name} placeholder="Enter first name" />
+              {#if formErrors.first_name}
+                <p class="text-sm text-destructive">{formErrors.first_name}</p>
+              {/if}
             </div>
             <div class="space-y-2">
               <Label for="last_name">Last Name *</Label>
-              <Input id="last_name" bind:value={form.last_name} placeholder="Enter last name" required />
+              <Input id="last_name" bind:value={form.last_name} placeholder="Enter last name" />
+              {#if formErrors.last_name}
+                <p class="text-sm text-destructive">{formErrors.last_name}</p>
+              {/if}
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label for="dob">Date of Birth *</Label>
-              <Input id="dob" type="date" bind:value={form.date_of_birth} required />
+              <Input id="dob" type="date" bind:value={form.date_of_birth} />
+              {#if formErrors.date_of_birth}
+                <p class="text-sm text-destructive">{formErrors.date_of_birth}</p>
+              {/if}
             </div>
             <div class="space-y-2">
               <Label for="gender">Gender *</Label>
@@ -104,6 +122,9 @@
                 <option value="female">Female</option>
                 <option value="other">Other</option>
               </Select>
+              {#if formErrors.gender}
+                <p class="text-sm text-destructive">{formErrors.gender}</p>
+              {/if}
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">

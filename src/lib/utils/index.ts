@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { Patient } from "$lib/lib/types.js";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -58,9 +59,69 @@ export function getStatusColor(status: string): string {
     pending: "bg-yellow-100 text-yellow-800",
     paid: "bg-green-100 text-green-800",
     partial: "bg-orange-100 text-orange-800",
+    overdue: "bg-red-100 text-red-800",
     ordered: "bg-blue-100 text-blue-800",
   };
   return colors[status] || "bg-gray-100 text-gray-800";
+}
+
+export function getGenderBadge(gender: string): string {
+  const colors: Record<string, string> = {
+    male: "bg-blue-100 text-blue-800",
+    female: "bg-pink-100 text-pink-800",
+    other: "bg-purple-100 text-purple-800",
+  };
+  return colors[gender] || "bg-gray-100 text-gray-800";
+}
+
+export function getPriorityColor(priority: string): string {
+  const colors: Record<string, string> = {
+    stat: "bg-red-100 text-red-800",
+    urgent: "bg-orange-100 text-orange-800",
+    routine: "bg-blue-100 text-blue-800",
+  };
+  return colors[priority] || "bg-gray-100 text-gray-800";
+}
+
+export function getPatientName(patients: Patient[], id: string): string {
+  const p = patients.find((p) => p.id === id);
+  return p ? `${p.first_name} ${p.last_name}` : "Unknown";
+}
+
+export function buildPatientMap(patients: Patient[]): Map<string, Patient> {
+  return new Map(patients.map((p) => [p.id, p]));
+}
+
+export function getInitials(firstOrFull: string, last?: string): string {
+  if (last) return `${firstOrFull[0]}${last[0]}`.toUpperCase();
+  return firstOrFull
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+export function getStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    scheduled: "Scheduled",
+    confirmed: "Confirmed",
+    in_progress: "In Progress",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    no_show: "No Show",
+    ordered: "Ordered",
+    paid: "Paid",
+    pending: "Pending",
+    partial: "Partial",
+    overdue: "Overdue",
+    active: "Active",
+    discharged: "Discharged",
+    available: "Available",
+    occupied: "Occupied",
+    reserved: "Reserved",
+  };
+  return labels[status] || status.replace(/_/g, " ");
 }
 
 export function debounce<T extends (...args: unknown[]) => unknown>(

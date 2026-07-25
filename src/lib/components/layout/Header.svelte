@@ -44,7 +44,7 @@
 
 <header class="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
   <!-- Mobile menu button -->
-  <Button variant="ghost" size="icon" class="lg:hidden" onclick={() => sidebar.openMobile()}>
+  <Button variant="ghost" size="icon" class="lg:hidden" onclick={() => sidebar.openMobile()} aria-label="Open menu">
     <Menu class="h-5 w-5" />
   </Button>
 
@@ -71,18 +71,19 @@
           placeholder="Search patients, appointments..."
           bind:value={searchQuery}
           class="h-9 w-64 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          aria-label="Search"
         />
         <Button type="submit" size="sm">Go</Button>
         <Button type="button" variant="ghost" size="sm" onclick={() => { showSearch = false; searchQuery = ""; }}>Cancel</Button>
       </form>
     {:else}
-      <Button variant="ghost" size="icon" onclick={() => (showSearch = true)}>
+      <Button variant="ghost" size="icon" onclick={() => (showSearch = true)} aria-label="Search">
         <Search class="h-5 w-5" />
       </Button>
     {/if}
 
     <!-- Notifications -->
-    <Button variant="ghost" size="icon" class="relative" onclick={() => notifications.add({ type: "info", title: "Notifications", message: "No new notifications" })}>
+    <Button variant="ghost" size="icon" class="relative" onclick={() => notifications.add({ type: "info", title: "Notifications", message: "No new notifications" })} aria-label="Notifications">
       <Bell class="h-5 w-5" />
       {#if unreadCount > 0}
         <span class="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground flex items-center justify-center">{unreadCount > 9 ? "9+" : unreadCount}</span>

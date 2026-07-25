@@ -29,14 +29,14 @@
     { title: "Lab & Diagnostics", href: "/lab", icon: TestTube },
     { title: "Pharmacy", href: "/pharmacy", icon: Pill },
     { title: "Billing", href: "/billing", icon: Receipt },
-    { title: "Staff", href: "/staff", icon: UserCog, roles: ["management" as const] },
+    { title: "Staff", href: "/staff", icon: UserCog, roles: ["admin" as const] },
     { title: "Reports", href: "/reports", icon: BarChart3 },
     { title: "Settings", href: "/settings", icon: Settings },
   ];
 
   const navItems = $derived(
     allNavItems.filter(
-      (item) => !item.roles || ($auth?.role && item.roles.includes($auth.role as any))
+      (item) => !item.roles || ($auth?.role && (item.roles as string[]).includes($auth.role))
     )
   );
 
@@ -72,6 +72,7 @@
       <button
         class="hidden lg:flex h-8 w-8 items-center justify-center rounded-md hover:bg-sidebar-accent"
         onclick={() => sidebar.toggle()}
+        aria-label="Toggle sidebar"
       >
         <Menu class="h-4 w-4" />
       </button>
@@ -107,6 +108,7 @@
           !$sidebar.isOpen && "justify-center"
         )}
         onclick={handleLogout}
+        aria-label="Logout"
       >
         <LogOut class="h-5 w-5 shrink-0" />
         {#if $sidebar.isOpen}
@@ -133,6 +135,7 @@
           <button
             class="h-8 w-8 flex items-center justify-center rounded-md hover:bg-sidebar-accent"
             onclick={() => sidebar.closeMobile()}
+            aria-label="Close sidebar"
           >
             <X class="h-4 w-4" />
           </button>

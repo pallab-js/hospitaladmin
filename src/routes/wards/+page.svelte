@@ -97,7 +97,9 @@
                     class="h-6 w-6 rounded {getBedStatusColor(
                       i < ward.occupied ? 'occupied' : 'available'
                     )}"
-                    title="Bed {i + 1}"
+                    role="img"
+                    aria-label="Bed {i + 1}: {i < ward.occupied ? 'occupied' : 'available'}"
+                    title="Bed {i + 1}: {i < ward.occupied ? 'occupied' : 'available'}"
                   ></div>
                 {/each}
               </div>

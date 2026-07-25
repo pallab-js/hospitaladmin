@@ -14,7 +14,7 @@
   import Badge from "$lib/components/ui/badge/index.svelte";
   import Separator from "$lib/components/ui/separator/index.svelte";
   import { ArrowLeft, Edit, Phone, Mail, MapPin, AlertTriangle, Shield, History, Printer } from "@lucide/svelte";
-  import { formatDate } from "$lib/utils/index.js";
+  import { formatDate, getGenderBadge } from "$lib/utils/index.js";
 
   let patient = $state<Patient | null>(null);
   let loading = $state(true);
@@ -29,15 +29,6 @@
       loading = false;
     }
   });
-
-  function getGenderBadge(gender: string) {
-    const colors: Record<string, string> = {
-      male: "bg-blue-100 text-blue-800",
-      female: "bg-pink-100 text-pink-800",
-      other: "bg-purple-100 text-purple-800",
-    };
-    return colors[gender] || "bg-gray-100 text-gray-800";
-  }
 </script>
 
 <PageLayout title={patient ? `${patient.first_name} ${patient.last_name}` : "Patient Details"}>

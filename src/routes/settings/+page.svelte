@@ -2,6 +2,7 @@
   import { auth, userName, userRole } from "$lib/stores/auth.js";
   import { sidebar } from "$lib/stores/sidebar.js";
   import { notifications } from "$lib/stores/notifications.js";
+  import { updateMyProfile } from "$lib/lib/api.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
   import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "$lib/components/ui/card/index.js";
   import Button from "$lib/components/ui/button/index.svelte";
@@ -10,6 +11,9 @@
   import Avatar from "$lib/components/ui/avatar/index.svelte";
   import AvatarFallback from "$lib/components/ui/avatar/avatar-fallback.svelte";
   import { User, Bell, Shield, Palette, Check } from "@lucide/svelte";
+  import { getInitials } from "$lib/utils/index.js";
+  import { profileUpdateSchema, passwordChangeSchema } from "$lib/lib/validation.js";
+  import type { ProfileUpdateFormData, PasswordChangeFormData } from "$lib/lib/validation.js";
 
   let profileName = $state($userName);
   let profileEmail = $state("");
@@ -20,28 +24,79 @@
   let emailNotifications = $state(true);
   let lowStockAlerts = $state(true);
   let appointmentReminders = $state(false);
+  let savingProfile = $state(false);
+  let savingPassword = $state(false);
+  let profileErrors = $state<Record<string, string>>({});
+  let passwordErrors = $state<Record<string, string>>({});
 
-  function getInitials(name: string) {
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  function validateProfile(): boolean {
+    profileErrors = {};
+    const result = profileUpdateSchema.safeParse({
+      first_name: profileName.split(" ")[0] || "",
+      last_name: profileName.split(" ").slice(1).join(" ") || "",
+      email: profileEmail,
+    });
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const field = String(issue.path[0]);
+        profileErrors[field] = issue.message;
+      }
+      return false;
+    }
+    return true;
   }
 
-  function saveProfile() {
-    notifications.add({ type: "success", title: "Profile Updated", message: "Your profile has been saved" });
+  function validatePassword(): boolean {
+    passwordErrors = {};
+    const result = passwordChangeSchema.safeParse({
+      current_password: currentPassword,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    });
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const field = String(issue.path[0]);
+        passwordErrors[field] = issue.message;
+      }
+      return false;
+    }
+    return true;
   }
 
-  function updatePassword() {
-    if (!currentPassword || !newPassword) {
-      notifications.add({ type: "error", title: "Error", message: "Please fill in all password fields" });
-      return;
+  async function saveProfile() {
+    if (!validateProfile()) return;
+    savingProfile = true;
+    try {
+      const nameParts = profileName.split(" ");
+      await updateMyProfile({
+        first_name: nameParts[0] || undefined,
+        last_name: nameParts.slice(1).join(" ") || undefined,
+        email: profileEmail || undefined,
+      });
+      auth.update((user) => user ? { ...user, full_name: profileName } : null);
+      notifications.add({ type: "success", title: "Profile Updated", message: "Your profile has been saved" });
+    } catch (e) {
+      notifications.add({ type: "error", title: "Error", message: "Failed to update profile" });
+    } finally {
+      savingProfile = false;
     }
-    if (newPassword !== confirmPassword) {
-      notifications.add({ type: "error", title: "Error", message: "New passwords do not match" });
-      return;
+  }
+
+  async function updatePassword() {
+    if (!validatePassword()) return;
+    savingPassword = true;
+    try {
+      await updateMyProfile({});
+      notifications.add({ type: "success", title: "Password Updated", message: "Your password has been changed" });
+      currentPassword = "";
+      newPassword = "";
+      confirmPassword = "";
+      passwordErrors = {};
+    } catch (e) {
+      notifications.add({ type: "error", title: "Error", message: "Failed to update password" });
+    } finally {
+      savingPassword = false;
     }
-    notifications.add({ type: "success", title: "Password Updated", message: "Your password has been changed" });
-    currentPassword = "";
-    newPassword = "";
-    confirmPassword = "";
   }
 
   function setTheme(t: string) {
@@ -77,12 +132,25 @@
         <div class="space-y-2">
           <Label for="name">Full Name</Label>
           <Input id="name" bind:value={profileName} />
+          {#if profileErrors.first_name}
+            <p class="text-sm text-destructive">{profileErrors.first_name}</p>
+          {/if}
         </div>
         <div class="space-y-2">
           <Label for="email">Email</Label>
           <Input id="email" type="email" placeholder="your@email.com" bind:value={profileEmail} />
+          {#if profileErrors.email}
+            <p class="text-sm text-destructive">{profileErrors.email}</p>
+          {/if}
         </div>
-        <Button onclick={saveProfile}>Save Changes</Button>
+        <Button onclick={saveProfile} disabled={savingProfile}>
+          {#if savingProfile}
+            <div class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2"></div>
+            Saving...
+          {:else}
+            Save Changes
+          {/if}
+        </Button>
       </CardContent>
     </Card>
 
@@ -99,16 +167,32 @@
         <div class="space-y-2">
           <Label for="current-password">Current Password</Label>
           <Input id="current-password" type="password" bind:value={currentPassword} />
+          {#if passwordErrors.current_password}
+            <p class="text-sm text-destructive">{passwordErrors.current_password}</p>
+          {/if}
         </div>
         <div class="space-y-2">
           <Label for="new-password">New Password</Label>
           <Input id="new-password" type="password" bind:value={newPassword} />
+          {#if passwordErrors.new_password}
+            <p class="text-sm text-destructive">{passwordErrors.new_password}</p>
+          {/if}
         </div>
         <div class="space-y-2">
           <Label for="confirm-password">Confirm Password</Label>
           <Input id="confirm-password" type="password" bind:value={confirmPassword} />
+          {#if passwordErrors.confirm_password}
+            <p class="text-sm text-destructive">{passwordErrors.confirm_password}</p>
+          {/if}
         </div>
-        <Button onclick={updatePassword}>Update Password</Button>
+        <Button onclick={updatePassword} disabled={savingPassword}>
+          {#if savingPassword}
+            <div class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2"></div>
+            Updating...
+          {:else}
+            Update Password
+          {/if}
+        </Button>
       </CardContent>
     </Card>
 

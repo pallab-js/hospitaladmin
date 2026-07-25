@@ -8,14 +8,15 @@
   import Card from "$lib/components/ui/card/index.svelte"; import CardContent from "$lib/components/ui/card/card-content.svelte";
   import Badge from "$lib/components/ui/badge/index.svelte";
   import Table from "$lib/components/ui/table/index.svelte"; import TableHeader from "$lib/components/ui/table/table-header.svelte"; import TableBody from "$lib/components/ui/table/table-body.svelte"; import TableRow from "$lib/components/ui/table/table-row.svelte"; import TableHead from "$lib/components/ui/table/table-head.svelte"; import TableCell from "$lib/components/ui/table/table-cell.svelte";
-  import { Plus, Search, Eye } from "@lucide/svelte";
-  import { debounce } from "$lib/utils/index.js";
+  import { Plus, Search, Eye, ChevronLeft, ChevronRight } from "@lucide/svelte";
+  import { debounce, getGenderBadge } from "$lib/utils/index.js";
 
   let patients = $state<Patient[]>([]);
   let loading = $state(true);
   let searchQuery = $state("");
   let currentPage = $state(1);
   let totalCount = $state(0);
+  const pageSize = 10;
 
   onMount(async () => {
     await loadPatients();
@@ -25,9 +26,9 @@
     loading = true;
     try {
       if (searchQuery) {
-        patients = await searchPatients({ query: searchQuery, page: currentPage });
+        patients = await searchPatients({ query: searchQuery, page: currentPage, limit: pageSize });
       } else {
-        patients = await getPatients(currentPage);
+        patients = await getPatients(currentPage, pageSize);
       }
       totalCount = patients.length;
     } catch (e) {
@@ -42,13 +43,16 @@
     await loadPatients();
   }, 300);
 
-  function getGenderBadge(gender: string) {
-    const colors: Record<string, string> = {
-      male: "bg-blue-100 text-blue-800",
-      female: "bg-pink-100 text-pink-800",
-      other: "bg-purple-100 text-purple-800",
-    };
-    return colors[gender] || "bg-gray-100 text-gray-800";
+  function prevPage() {
+    if (currentPage > 1) {
+      currentPage--;
+      loadPatients();
+    }
+  }
+
+  function nextPage() {
+    currentPage++;
+    loadPatients();
   }
 </script>
 
@@ -118,7 +122,7 @@
                 <TableCell>{new Date(patient.created_at).toLocaleDateString()}</TableCell>
                 <TableCell class="text-right">
                   <a href="/patients/{patient.id}">
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" aria-label="View patient {patient.first_name} {patient.last_name}">
                       <Eye class="h-4 w-4" />
                     </Button>
                   </a>
@@ -127,6 +131,21 @@
             {/each}
           </TableBody>
         </Table>
+        {#if patients.length >= pageSize}
+          <div class="flex items-center justify-between border-t px-4 py-3">
+            <p class="text-sm text-muted-foreground">Page {currentPage}</p>
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" onclick={prevPage} disabled={currentPage <= 1}>
+                <ChevronLeft class="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <Button variant="outline" size="sm" onclick={nextPage}>
+                Next
+                <ChevronRight class="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        {/if}
       {/if}
     </CardContent>
   </Card>

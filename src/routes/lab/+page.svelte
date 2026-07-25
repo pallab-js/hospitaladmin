@@ -9,11 +9,14 @@
   import CardContent from "$lib/components/ui/card/card-content.svelte";
   import Badge from "$lib/components/ui/badge/index.svelte";
   import { TestTube, Clock, CheckCircle, AlertCircle } from "@lucide/svelte";
+  import { getStatusColor, getPriorityColor, buildPatientMap } from "$lib/utils/index.js";
 
   let orders = $state<LabOrder[]>([]);
   let tests = $state<LabTest[]>([]);
   let patients = $state<Patient[]>([]);
   let loading = $state(true);
+  let patientMap = $state<Map<string, Patient>>(new Map());
+  let testMap = $state<Map<string, LabTest>>(new Map());
 
   onMount(async () => {
     try {
@@ -21,39 +24,21 @@
       orders = o;
       tests = t;
       patients = p;
+      patientMap = buildPatientMap(p);
+      testMap = new Map(t.map((test) => [test.id, test]));
     } finally {
       loading = false;
     }
   });
 
   function getPatientName(id: string) {
-    const p = patients.find((p) => p.id === id);
+    const p = patientMap.get(id);
     return p ? `${p.first_name} ${p.last_name}` : "Unknown";
   }
 
   function getTestName(orderId: string) {
-    // demo: map order to test by index
     const idx = parseInt(orderId.replace("lo", "")) - 1;
     return tests[idx]?.name || "Lab Test";
-  }
-
-  function getStatusColor(status: string) {
-    const colors: Record<string, string> = {
-      ordered: "bg-warning/10 text-warning",
-      in_progress: "bg-info/10 text-info",
-      completed: "bg-success/10 text-success",
-      cancelled: "bg-destructive/10 text-destructive",
-    };
-    return colors[status] || "bg-muted text-muted-foreground";
-  }
-
-  function getPriorityColor(priority: string) {
-    const colors: Record<string, string> = {
-      stat: "bg-destructive/10 text-destructive",
-      urgent: "bg-warning/10 text-warning",
-      routine: "bg-muted text-muted-foreground",
-    };
-    return colors[priority] || "bg-muted text-muted-foreground";
   }
 
   const pendingCount = $derived(orders.filter((o) => o.status === "ordered").length);

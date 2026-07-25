@@ -7,11 +7,13 @@
   import Card from "$lib/components/ui/card/index.svelte"; import CardContent from "$lib/components/ui/card/card-content.svelte";
   import Badge from "$lib/components/ui/badge/index.svelte";
   import Table from "$lib/components/ui/table/index.svelte"; import TableHeader from "$lib/components/ui/table/table-header.svelte"; import TableBody from "$lib/components/ui/table/table-body.svelte"; import TableRow from "$lib/components/ui/table/table-row.svelte"; import TableHead from "$lib/components/ui/table/table-head.svelte"; import TableCell from "$lib/components/ui/table/table-cell.svelte";
-  import { Plus, Calendar, Clock } from "@lucide/svelte";
-  import { formatDate, formatTime, getStatusColor } from "$lib/utils/index.js";
+  import { Plus, Calendar, Clock, ChevronLeft, ChevronRight } from "@lucide/svelte";
+  import { formatDate, formatTime, getStatusColor, getStatusLabel } from "$lib/utils/index.js";
 
   let appointments = $state<AppointmentWithDetails[]>([]);
   let loading = $state(true);
+  let currentPage = $state(1);
+  const pageSize = 15;
 
   onMount(async () => {
     await loadAppointments();
@@ -20,7 +22,7 @@
   async function loadAppointments() {
     loading = true;
     try {
-      appointments = await getAppointments();
+      appointments = await getAppointments(currentPage, pageSize);
     } catch (e) {
       console.error("Failed to load appointments:", e);
     } finally {
@@ -28,16 +30,16 @@
     }
   }
 
-  function getStatusLabel(status: string) {
-    const labels: Record<string, string> = {
-      scheduled: "Scheduled",
-      confirmed: "Confirmed",
-      in_progress: "In Progress",
-      completed: "Completed",
-      cancelled: "Cancelled",
-      no_show: "No Show",
-    };
-    return labels[status] || status;
+  function prevPage() {
+    if (currentPage > 1) {
+      currentPage--;
+      loadAppointments();
+    }
+  }
+
+  function nextPage() {
+    currentPage++;
+    loadAppointments();
   }
 </script>
 
@@ -111,6 +113,21 @@
             {/each}
           </TableBody>
         </Table>
+        {#if appointments.length >= pageSize}
+          <div class="flex items-center justify-between border-t px-4 py-3">
+            <p class="text-sm text-muted-foreground">Page {currentPage}</p>
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" onclick={prevPage} disabled={currentPage <= 1}>
+                <ChevronLeft class="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <Button variant="outline" size="sm" onclick={nextPage}>
+                Next
+                <ChevronRight class="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        {/if}
       {/if}
     </CardContent>
   </Card>

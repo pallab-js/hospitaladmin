@@ -30,7 +30,7 @@ try {
 const demoUser: User = {
   id: "demo-001",
   username: "admin",
-  role: "management",
+  role: "admin",
   employee_id: null,
   full_name: "Admin User",
 };
@@ -180,16 +180,10 @@ const demoStaff: Staff[] = [
 // Auth commands
 export async function login(username: string, password: string) {
   if (!isTauri) {
-    const demoUsers: Record<string, { password: string; user: User }> = {
-      admin: { password: "admin123", user: { id: "u1", username: "admin", role: "management", employee_id: null, full_name: "Admin User" } },
-      doctor: { password: "doctor123", user: { id: "u2", username: "doctor", role: "doctor", employee_id: "doc-001", full_name: "Dr. Sarah Johnson" } },
-      staff: { password: "staff123", user: { id: "u3", username: "staff", role: "staff", employee_id: "s4", full_name: "Robert Wilson" } },
-    };
-    const match = demoUsers[username];
-    if (match && match.password === password) {
-      return { success: true, message: "Login successful", user: match.user };
+    if (!username || !password) {
+      return { success: false, message: "Username and password are required", user: null };
     }
-    return { success: false, message: "Invalid credentials. Try admin/admin123", user: null };
+    return { success: false, message: "Demo mode: use the desktop app for full authentication", user: null };
   }
   return invoke<{ success: boolean; message: string; user: User | null }>(
     "login",
@@ -200,6 +194,34 @@ export async function login(username: string, password: string) {
 export async function logout() {
   if (!isTauri) return;
   return invoke<void>("logout");
+}
+
+export async function register(data: {
+  username: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  department_id?: string;
+  qualification?: string;
+  specialization?: string;
+}) {
+  if (!isTauri) {
+    const newUser: User = {
+      id: crypto.randomUUID(),
+      username: data.username,
+      role: data.role as User["role"],
+      employee_id: crypto.randomUUID(),
+      full_name: `${data.first_name} ${data.last_name}`,
+    };
+    return { success: true, message: "Registration successful", user: newUser };
+  }
+  return invoke<{ success: boolean; message: string; user: User | null }>(
+    "register",
+    { request: data }
+  );
 }
 
 export async function getCurrentUser() {
@@ -409,4 +431,64 @@ export async function getMonthlyTrends(months?: number) {
     ] as MonthlyTrend[];
   }
   return invoke<MonthlyTrend[]>("get_monthly_trends", { months });
+}
+
+// Update commands
+export async function updateMyProfile(data: {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  qualification?: string;
+  specialization?: string;
+}) {
+  if (!isTauri) return;
+  return invoke<void>("update_my_profile", { request: data });
+}
+
+export async function updatePatient(data: {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  insurance_provider?: string;
+  insurance_id?: string;
+  allergies?: string;
+  medical_history?: string;
+}) {
+  if (!isTauri) return;
+  return invoke<void>("update_patient", { request: data });
+}
+
+export async function updateBed(data: {
+  bed_id: string;
+  status?: string;
+  bed_type?: string;
+  daily_rate?: number;
+}) {
+  if (!isTauri) return;
+  return invoke<void>("update_bed", { request: data });
+}
+
+export async function updateMedication(data: {
+  medication_id: string;
+  name?: string;
+  unit_price?: number;
+  is_active?: boolean;
+}) {
+  if (!isTauri) return;
+  return invoke<void>("update_medication", { request: data });
+}
+
+export async function updateInventory(data: {
+  inventory_id: string;
+  quantity?: number;
+  expiry_date?: string;
+}) {
+  if (!isTauri) return;
+  return invoke<void>("update_inventory", { request: data });
 }

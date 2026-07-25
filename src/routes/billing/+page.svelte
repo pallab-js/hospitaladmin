@@ -9,36 +9,27 @@
   import CardContent from "$lib/components/ui/card/card-content.svelte";
   import Badge from "$lib/components/ui/badge/index.svelte";
   import { DollarSign, CreditCard, FileText, AlertCircle } from "@lucide/svelte";
-  import { formatCurrency, formatDate } from "$lib/utils/index.js";
+  import { formatCurrency, formatDate, getStatusColor, buildPatientMap } from "$lib/utils/index.js";
 
   let invoices = $state<Invoice[]>([]);
   let patients = $state<Patient[]>([]);
   let loading = $state(true);
+  let patientMap = $state<Map<string, Patient>>(new Map());
 
   onMount(async () => {
     try {
       const [i, p] = await Promise.all([getInvoices(), getPatients()]);
       invoices = i;
       patients = p;
+      patientMap = buildPatientMap(p);
     } finally {
       loading = false;
     }
   });
 
   function getPatientName(id: string) {
-    const p = patients.find((p) => p.id === id);
+    const p = patientMap.get(id);
     return p ? `${p.first_name} ${p.last_name}` : "Unknown";
-  }
-
-  function getStatusColor(status: string) {
-    const colors: Record<string, string> = {
-      paid: "bg-success/10 text-success",
-      pending: "bg-warning/10 text-warning",
-      partial: "bg-info/10 text-info",
-      overdue: "bg-destructive/10 text-destructive",
-      cancelled: "bg-muted text-muted-foreground",
-    };
-    return colors[status] || "bg-muted text-muted-foreground";
   }
 
   const totalRevenue = $derived(
@@ -53,7 +44,7 @@
     invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + i.total, 0)
   );
   const todayCount = $derived(
-    invoices.filter((i) => i.invoice_date === "2024-01-15").length
+    invoices.filter((i) => i.invoice_date === new Date().toISOString().slice(0, 10)).length
   );
 </script>
 

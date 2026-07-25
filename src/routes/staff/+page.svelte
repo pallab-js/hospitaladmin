@@ -12,6 +12,7 @@
   import AvatarFallback from "$lib/components/ui/avatar/avatar-fallback.svelte";
   import Input from "$lib/components/ui/input/index.svelte";
   import { UserCog, Stethoscope, Heart, Shield, Search } from "@lucide/svelte";
+  import { getInitials } from "$lib/utils/index.js";
 
   let staff = $state<Staff[]>([]);
   let loading = $state(true);
@@ -43,10 +44,6 @@
       receptionist: "bg-secondary text-secondary-foreground",
     };
     return colors[role] || "bg-muted text-muted-foreground";
-  }
-
-  function getInitials(first: string, last: string) {
-    return `${first[0]}${last[0]}`.toUpperCase();
   }
 
   const filteredStaff = $derived(
@@ -114,6 +111,7 @@
           <select
             bind:value={filterRole}
             class="rounded-md border bg-background px-3 py-2 text-sm"
+            aria-label="Filter by role"
           >
             <option value="all">All Roles</option>
             <option value="doctor">Doctors</option>
