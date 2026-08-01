@@ -10,10 +10,10 @@
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
@@ -29,13 +29,7 @@
 	"dependencies": {
 		"@lucide/svelte": "^1.25.0",
 		"@tauri-apps/api": "^2.11.1",
-		"@tauri-apps/plugin-dialog": "^2.7.2",
-		"@tauri-apps/plugin-fs": "^2.5.1",
-		"bits-ui": "^2.18.1",
-		"chart.js": "^4.5.1",
 		"clsx": "^2.1.1",
-		"mode-watcher": "^1.1.0",
-		"svelte-chartjs": "^4.0.1",
 		"tailwind-merge": "^3.6.0",
 		"zod": "^4.4.3"
 	}
