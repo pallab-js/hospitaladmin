@@ -308,7 +308,7 @@ async fn seed_wards_and_beds(pool: &SqlitePool) -> Result<(), Box<dyn std::error
 
         for bed_num in 1..=bed_count {
             let bed_id = Uuid::new_v4().to_string();
-            let room_num = format!("{}-{}", &name[..1].to_uppercase(), bed_num);
+            let room_num = format!("{}-{}", name[..1].to_uppercase(), bed_num);
             sqlx::query(
                 "INSERT INTO beds (id, ward_id, room_number, bed_number, bed_type, status, daily_rate) VALUES (?, ?, ?, ?, 'general', 'available', 1500)"
             )
@@ -441,7 +441,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
         )
         .bind(&inv_id)
         .bind(&id)
-        .bind(format!("BATCH-{}", &id[..8].to_uppercase()))
+        .bind(format!("BATCH-{}", id[..8].to_uppercase()))
         .bind(qty)
         .execute(pool)
         .await?;
