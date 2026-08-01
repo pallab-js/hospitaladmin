@@ -75,7 +75,9 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn get_pool() -> &'static SqlitePool {
-    DB_POOL.get().expect("Database pool not initialized — app must call db::init() first")
+    DB_POOL
+        .get()
+        .expect("Database pool not initialized — app must call db::init() first")
 }
 
 async fn run_migrations(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
