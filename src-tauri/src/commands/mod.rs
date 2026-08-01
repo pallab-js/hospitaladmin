@@ -15,3 +15,4 @@ pub mod pharmacy;
 pub mod prescriptions;
 pub mod reports;
 pub mod staff;
+pub mod updates;

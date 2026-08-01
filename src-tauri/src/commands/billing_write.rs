@@ -64,7 +64,7 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
         .map(|i| i.unit_price * (i.quantity.unwrap_or(1) as f64))
         .sum();
     let tax_rate = request.tax_rate.unwrap_or(0.1);
-    if tax_rate < 0.0 || tax_rate > 1.0 {
+    if !(0.0..=1.0).contains(&tax_rate) {
         return Err("Tax rate must be between 0.0 and 1.0".to_string());
     }
     let tax = subtotal * tax_rate;

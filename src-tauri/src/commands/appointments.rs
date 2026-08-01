@@ -163,6 +163,18 @@ pub async fn update_appointment_status(id: String, status: String) -> Result<App
     let session = guards::authenticated()?;
     let pool = get_pool();
 
+    let valid_statuses = [
+        "scheduled",
+        "confirmed",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "no_show",
+    ];
+    if !valid_statuses.contains(&status.as_str()) {
+        return Err("Invalid appointment status".to_string());
+    }
+
     sqlx::query("UPDATE appointments SET status = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(&status)
         .bind(&id)

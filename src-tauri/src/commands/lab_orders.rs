@@ -83,7 +83,7 @@ pub async fn create_lab_order(request: CreateLabOrderRequest) -> Result<String, 
 
 #[tauri::command]
 pub async fn update_lab_result(request: UpdateLabResultRequest) -> Result<(), String> {
-    let session = guards::authenticated()?;
+    let session = guards::lab_tech_only()?;
     let pool = get_pool();
 
     sqlx::query(
@@ -111,7 +111,7 @@ pub async fn update_lab_result(request: UpdateLabResultRequest) -> Result<(), St
 
 #[tauri::command]
 pub async fn complete_lab_order(order_id: String) -> Result<(), String> {
-    let session = guards::authenticated()?;
+    let session = guards::lab_tech_only()?;
     let pool = get_pool();
 
     sqlx::query(

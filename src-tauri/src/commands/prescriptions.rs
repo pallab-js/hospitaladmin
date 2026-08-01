@@ -120,7 +120,7 @@ pub async fn get_prescriptions_by_patient(patient_id: String) -> Result<Vec<Pres
 
 #[tauri::command]
 pub async fn dispense_prescription_item(item_id: String) -> Result<(), String> {
-    let session = guards::authenticated()?;
+    let session = guards::pharmacist_only()?;
     let pool = get_pool();
 
     let mut tx = pool

@@ -255,7 +255,11 @@ pub async fn register(request: RegisterRequest) -> Result<LoginResponse, String>
     if request.username.len() < 3 || request.username.len() > 50 {
         return Err("Username must be 3-50 characters".into());
     }
-    if !request.username.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+    if !request
+        .username
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
         return Err("Username must contain only letters, numbers, and underscores".into());
     }
     validate_password(&request.password)?;
@@ -266,7 +270,14 @@ pub async fn register(request: RegisterRequest) -> Result<LoginResponse, String>
         return Err("Last name is required".into());
     }
 
-    let valid_roles = ["doctor", "nurse", "receptionist", "pharmacist", "lab_tech", "billing_staff"];
+    let valid_roles = [
+        "doctor",
+        "nurse",
+        "receptionist",
+        "pharmacist",
+        "lab_tech",
+        "billing_staff",
+    ];
     if !valid_roles.contains(&request.role.as_str()) {
         return Err("Invalid role".into());
     }
@@ -286,7 +297,10 @@ pub async fn register(request: RegisterRequest) -> Result<LoginResponse, String>
     let password_hash = bcrypt::hash(&request.password, 12)
         .map_err(|_| "Registration service unavailable".to_string())?;
 
-    let mut tx = pool.begin().await.map_err(|_| "Registration service unavailable".to_string())?;
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|_| "Registration service unavailable".to_string())?;
 
     // Create staff record
     sqlx::query(
@@ -309,7 +323,7 @@ pub async fn register(request: RegisterRequest) -> Result<LoginResponse, String>
     // Create user account
     sqlx::query(
         "INSERT INTO users (id, username, password_hash, role, employee_id, is_active)
-         VALUES (?, ?, ?, ?, ?, 1)"
+         VALUES (?, ?, ?, ?, ?, 1)",
     )
     .bind(&user_id)
     .bind(&request.username)
@@ -320,7 +334,9 @@ pub async fn register(request: RegisterRequest) -> Result<LoginResponse, String>
     .await
     .map_err(|_| "Failed to create user account".to_string())?;
 
-    tx.commit().await.map_err(|_| "Registration failed".to_string())?;
+    tx.commit()
+        .await
+        .map_err(|_| "Registration failed".to_string())?;
 
     let full_name = format!("{} {}", request.first_name.trim(), request.last_name.trim());
 
@@ -374,8 +390,8 @@ pub async fn change_password(request: ChangePasswordRequest) -> Result<(), Strin
     }
 
     // Hash new password
-    let new_hash = bcrypt::hash(&request.new_password, 12)
-        .map_err(|_| "Service unavailable".to_string())?;
+    let new_hash =
+        bcrypt::hash(&request.new_password, 12).map_err(|_| "Service unavailable".to_string())?;
 
     // Update password
     sqlx::query("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?")

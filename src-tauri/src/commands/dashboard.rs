@@ -103,7 +103,7 @@ pub async fn get_dashboard_stats() -> Result<DashboardStats, String> {
             .unwrap_or(0);
     let bed_occupancy_rate = (occupied_beds as f64 / total_beds as f64) * 100.0;
 
-    let revenue_today: f64 = if session.role == "management" {
+    let revenue_today: f64 = if session.role == "admin" {
         sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date = ?")
             .bind(&today)
             .fetch_one(pool)
@@ -142,7 +142,7 @@ pub async fn get_dashboard_stats() -> Result<DashboardStats, String> {
 
 #[tauri::command]
 pub async fn get_revenue_chart(days: Option<i64>) -> Result<Vec<RevenueData>, String> {
-    guards::management_only()?;
+    guards::admin_only()?;
     let pool = get_pool();
     let days = days.unwrap_or(7);
 
@@ -201,7 +201,7 @@ pub async fn get_department_load() -> Result<Vec<DepartmentLoad>, String> {
 
 #[tauri::command]
 pub async fn get_monthly_trends(months: Option<i64>) -> Result<Vec<MonthlyTrend>, String> {
-    guards::management_only()?;
+    guards::admin_only()?;
     let pool = get_pool();
     let months = months.unwrap_or(6);
 

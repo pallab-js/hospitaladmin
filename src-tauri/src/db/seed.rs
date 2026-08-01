@@ -5,7 +5,8 @@ use uuid::Uuid;
 const SEED_USER_PASSWORD_LEN: usize = 16;
 
 fn generate_random_password() -> String {
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    const CHARSET: &[u8] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
     let mut rng = rand::thread_rng();
     let mut pwd = String::with_capacity(SEED_USER_PASSWORD_LEN);
     for _ in 0..SEED_USER_PASSWORD_LEN {
@@ -43,9 +44,12 @@ pub async fn seed(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
     println!("[seed] Database seeded successfully!");
     #[cfg(debug_assertions)]
     {
-        println!("[seed] Credentials written to hms-credentials.log (check the app data directory)");
+        println!(
+            "[seed] Credentials written to hms-credentials.log (check the app data directory)"
+        );
         let log_path = std::env::temp_dir().join("hms-credentials.log");
-        let mut log_content = String::from("[seed] === INITIAL CREDENTIALS (CHANGE THESE IMMEDIATELY) ===\n");
+        let mut log_content =
+            String::from("[seed] === INITIAL CREDENTIALS (CHANGE THESE IMMEDIATELY) ===\n");
         for (username, password) in &credentials {
             log_content.push_str(&format!("[seed]   {} / {}\n", username, password));
         }
@@ -154,7 +158,9 @@ async fn seed_staff(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-async fn seed_users(pool: &SqlitePool) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
+async fn seed_users(
+    pool: &SqlitePool,
+) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
     let mut credentials: Vec<(String, String)> = Vec::new();
 
     let admin_id = Uuid::new_v4().to_string();
