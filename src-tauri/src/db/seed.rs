@@ -1,5 +1,19 @@
+use rand::Rng;
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
+
+const SEED_USER_PASSWORD_LEN: usize = 16;
+
+fn generate_random_password() -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    let mut rng = rand::thread_rng();
+    let mut pwd = String::with_capacity(SEED_USER_PASSWORD_LEN);
+    for _ in 0..SEED_USER_PASSWORD_LEN {
+        let idx = rng.gen_range(0..CHARSET.len());
+        pwd.push(CHARSET[idx] as char);
+    }
+    pwd
+}
 
 pub async fn seed(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
     let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
@@ -14,7 +28,7 @@ pub async fn seed(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
 
     seed_departments(pool).await?;
     seed_staff(pool).await?;
-    seed_users(pool).await?;
+    let credentials = seed_users(pool).await?;
     seed_wards_and_beds(pool).await?;
     seed_medications(pool).await?;
     seed_lab_tests(pool).await?;
@@ -27,6 +41,17 @@ pub async fn seed(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
         .execute(pool).await?;
 
     println!("[seed] Database seeded successfully!");
+    #[cfg(debug_assertions)]
+    {
+        println!("[seed] Credentials written to hms-credentials.log (check the app data directory)");
+        let log_path = std::env::temp_dir().join("hms-credentials.log");
+        let mut log_content = String::from("[seed] === INITIAL CREDENTIALS (CHANGE THESE IMMEDIATELY) ===\n");
+        for (username, password) in &credentials {
+            log_content.push_str(&format!("[seed]   {} / {}\n", username, password));
+        }
+        log_content.push_str("[seed] ========================================================\n");
+        let _ = std::fs::write(&log_path, log_content);
+    }
     Ok(())
 }
 
@@ -59,45 +84,45 @@ async fn seed_departments(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
 async fn seed_staff(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
     let staff_data = vec![
         (
-            "Sarah",
-            "Johnson",
+            "Priya",
+            "Sharma",
             "doctor",
             "GM",
             "MBBS, MD",
             "General Medicine",
         ),
         (
-            "Michael",
-            "Chen",
+            "Rajesh",
+            "Gupta",
             "doctor",
             "CARD",
             "MBBS, DM",
             "Cardiology",
         ),
         (
-            "Emily",
-            "Williams",
+            "Ananya",
+            "Patel",
             "doctor",
             "ORTH",
             "MBBS, MS",
             "Orthopedics",
         ),
-        ("David", "Brown", "doctor", "PED", "MBBS, MD", "Pediatrics"),
+        ("Vikram", "Singh", "doctor", "PED", "MBBS, MD", "Pediatrics"),
         (
-            "Lisa",
-            "Davis",
+            "Deepa",
+            "Nair",
             "doctor",
             "EMER",
             "MBBS, Diploma in Emergency Medicine",
             "Emergency",
         ),
-        ("James", "Wilson", "nurse", "ICU", "B.Sc Nursing", ""),
-        ("Emma", "Taylor", "nurse", "GM", "B.Sc Nursing", ""),
-        ("Robert", "Anderson", "receptionist", "GM", "B.Com", ""),
-        ("Maria", "Garcia", "pharmacist", "PHARM", "B.Pharm", ""),
+        ("Sunita", "Verma", "nurse", "ICU", "B.Sc Nursing", ""),
+        ("Meena", "Iyer", "nurse", "GM", "B.Sc Nursing", ""),
+        ("Rahul", "Joshi", "receptionist", "GM", "B.Com", ""),
+        ("Kavita", "Reddy", "pharmacist", "PHARM", "B.Pharm", ""),
         (
-            "John",
-            "Martinez",
+            "Arjun",
+            "Menon",
             "lab_tech",
             "PATH",
             "B.Sc Medical Lab Tech",
@@ -129,9 +154,12 @@ async fn seed_staff(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
+async fn seed_users(pool: &SqlitePool) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
+    let mut credentials: Vec<(String, String)> = Vec::new();
+
     let admin_id = Uuid::new_v4().to_string();
-    let password_hash = bcrypt::hash("admin123", 12)?;
+    let admin_password = generate_random_password();
+    let password_hash = bcrypt::hash(&admin_password, 12)?;
 
     sqlx::query(
         "INSERT INTO users (id, username, password_hash, role, is_active) VALUES (?, ?, ?, ?, 1)",
@@ -139,20 +167,24 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
     .bind(&admin_id)
     .bind("admin")
     .bind(&password_hash)
-    .bind("management")
+    .bind("admin")
     .execute(pool)
     .await?;
+    credentials.push(("admin".to_string(), admin_password));
 
     // Create a canonical doctor user (matches README credentials)
     let doc_user_id = Uuid::new_v4().to_string();
+    let doc_password = generate_random_password();
+    let doc_hash = bcrypt::hash(&doc_password, 12)?;
     sqlx::query(
         "INSERT INTO users (id, username, password_hash, role, is_active) VALUES (?, ?, ?, 'doctor', 1)"
     )
     .bind(&doc_user_id)
     .bind("doctor")
-    .bind(&password_hash)
+    .bind(&doc_hash)
     .execute(pool)
     .await?;
+    credentials.push(("doctor".to_string(), doc_password));
 
     // Create user accounts for doctors
     let doctors = sqlx::query("SELECT id, first_name, last_name FROM staff WHERE role = 'doctor'")
@@ -181,7 +213,8 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
             suffix += 1;
         }
 
-        let hash = bcrypt::hash("doctor123", 12)?;
+        let user_password = generate_random_password();
+        let hash = bcrypt::hash(&user_password, 12)?;
 
         sqlx::query(
             "INSERT INTO users (id, username, password_hash, role, employee_id, is_active) VALUES (?, ?, ?, 'doctor', ?, 1)"
@@ -192,6 +225,7 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
         .bind(doc.get::<String, _>("id"))
         .execute(pool)
         .await?;
+        credentials.push((username, user_password));
     }
 
     // Create user for staff
@@ -221,7 +255,8 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
             suffix += 1;
         }
 
-        let hash = bcrypt::hash("staff123", 12)?;
+        let user_password = generate_random_password();
+        let hash = bcrypt::hash(&user_password, 12)?;
 
         sqlx::query(
             "INSERT INTO users (id, username, password_hash, role, employee_id, is_active) VALUES (?, ?, ?, 'staff', ?, 1)"
@@ -232,9 +267,10 @@ async fn seed_users(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>>
         .bind(s.get::<String, _>("id"))
         .execute(pool)
         .await?;
+        credentials.push((username, user_password));
     }
 
-    Ok(())
+    Ok(credentials)
 }
 
 async fn username_exists(
@@ -273,7 +309,7 @@ async fn seed_wards_and_beds(pool: &SqlitePool) -> Result<(), Box<dyn std::error
             let bed_id = Uuid::new_v4().to_string();
             let room_num = format!("{}-{}", &name[..1].to_uppercase(), bed_num);
             sqlx::query(
-                "INSERT INTO beds (id, ward_id, room_number, bed_number, bed_type, status, daily_rate) VALUES (?, ?, ?, ?, 'general', 'available', 500)"
+                "INSERT INTO beds (id, ward_id, room_number, bed_number, bed_type, status, daily_rate) VALUES (?, ?, ?, ?, 'general', 'available', 1500)"
             )
             .bind(&bed_id)
             .bind(&ward_id)
@@ -304,7 +340,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Capsule",
             "250mg",
             "Sun Pharma",
-            8.0,
+            12.0,
         ),
         (
             "Metformin 500mg",
@@ -313,7 +349,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Tablet",
             "500mg",
             "USV",
-            5.0,
+            8.0,
         ),
         (
             "Omeprazole 20mg",
@@ -322,7 +358,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Capsule",
             "20mg",
             "Dr. Reddy's",
-            6.0,
+            10.0,
         ),
         (
             "Cetirizine 10mg",
@@ -331,7 +367,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Tablet",
             "10mg",
             "Cipla",
-            3.0,
+            5.0,
         ),
         (
             "Amlodipine 5mg",
@@ -340,7 +376,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Tablet",
             "5mg",
             "Pfizer",
-            7.0,
+            9.0,
         ),
         (
             "Azithromycin 500mg",
@@ -349,7 +385,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Tablet",
             "500mg",
             "Zydus",
-            12.0,
+            35.0,
         ),
         (
             "Pantoprazole 40mg",
@@ -358,7 +394,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Tablet",
             "40mg",
             "Alkem",
-            8.0,
+            12.0,
         ),
         (
             "Diclofenac 50mg",
@@ -367,7 +403,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Tablet",
             "50mg",
             "Novartis",
-            4.0,
+            6.0,
         ),
         (
             "Salbutamol Inhaler",
@@ -376,7 +412,7 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
             "Inhaler",
             "100mcg",
             "Cipla",
-            150.0,
+            250.0,
         ),
     ];
 
@@ -413,12 +449,8 @@ async fn seed_medications(pool: &SqlitePool) -> Result<(), Box<dyn std::error::E
 }
 
 fn rand_qty() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .subsec_nanos();
-    50 + (nanos % 200) as i64
+    let mut rng = rand::thread_rng();
+    50 + rng.gen_range(0..200)
 }
 
 async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
@@ -429,7 +461,7 @@ async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
             "Pathology",
             "4.0-5.5 million/uL",
             "million/uL",
-            150.0,
+            250.0,
         ),
         (
             "Blood Sugar Fasting",
@@ -437,7 +469,7 @@ async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
             "Pathology",
             "70-100 mg/dL",
             "mg/dL",
-            80.0,
+            60.0,
         ),
         (
             "Blood Sugar Post Prandial",
@@ -445,7 +477,7 @@ async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
             "Pathology",
             "80-140 mg/dL",
             "mg/dL",
-            80.0,
+            60.0,
         ),
         (
             "Lipid Profile",
@@ -453,7 +485,7 @@ async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
             "Pathology",
             "Desirable <200 mg/dL",
             "mg/dL",
-            300.0,
+            400.0,
         ),
         (
             "Liver Function Test",
@@ -461,7 +493,7 @@ async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
             "Pathology",
             "AST 10-40 U/L",
             "U/L",
-            400.0,
+            500.0,
         ),
         (
             "Kidney Function Test",
@@ -469,7 +501,7 @@ async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
             "Pathology",
             "Creatinine 0.6-1.2 mg/dL",
             "mg/dL",
-            350.0,
+            450.0,
         ),
         (
             "Thyroid Profile",
@@ -477,17 +509,17 @@ async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
             "Pathology",
             "TSH 0.4-4.0 mIU/L",
             "mIU/L",
-            500.0,
+            600.0,
         ),
-        ("Urine Routine", "UR", "Pathology", "Normal", "", 100.0),
-        ("ECG", "ECG", "Cardiology", "Normal Sinus Rhythm", "", 200.0),
+        ("Urine Routine", "UR", "Pathology", "Normal", "", 150.0),
+        ("ECG", "ECG", "Cardiology", "Normal Sinus Rhythm", "", 300.0),
         (
             "X-Ray Chest",
             "XRC",
             "Radiology",
             "No active lesion",
             "",
-            400.0,
+            500.0,
         ),
     ];
 
@@ -512,40 +544,40 @@ async fn seed_lab_tests(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Err
 async fn seed_sample_patients(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
     let patients = vec![
         (
-            "Rajesh",
+            "Amit",
             "Kumar",
             "1985-03-15",
             "male",
             "B+",
             "9876543210",
-            "123 Main St",
+            "12 MG Road, Delhi",
         ),
         (
-            "Priya",
+            "Priyanka",
             "Sharma",
             "1990-07-22",
             "female",
             "O+",
             "9876543211",
-            "456 Oak Ave",
+            "45 Gandhi Nagar, Mumbai",
         ),
         (
-            "Amit",
+            "Suresh",
             "Patel",
             "1978-11-08",
             "male",
             "A+",
             "9876543212",
-            "789 Pine Rd",
+            "78 Nehru Place, Bangalore",
         ),
         (
-            "Sneha",
+            "Anjali",
             "Reddy",
             "1995-01-30",
             "female",
             "AB+",
             "9876543213",
-            "321 Elm St",
+            "32 Anna Salai, Chennai",
         ),
         (
             "Vikram",
@@ -554,7 +586,7 @@ async fn seed_sample_patients(pool: &SqlitePool) -> Result<(), Box<dyn std::erro
             "male",
             "O-",
             "9876543214",
-            "654 Maple Dr",
+            "65 Park Street, Kolkata",
         ),
     ];
 

@@ -9,7 +9,7 @@
   import CardContent from "$lib/components/ui/card/card-content.svelte";
   import Badge from "$lib/components/ui/badge/index.svelte";
   import { TestTube, Clock, CheckCircle, AlertCircle } from "@lucide/svelte";
-  import { getStatusColor, getPriorityColor, buildPatientMap } from "$lib/utils/index.js";
+  import { getStatusColor, getPriorityColor, buildPatientMap, formatCurrency } from "$lib/utils/index.js";
 
   let orders = $state<LabOrder[]>([]);
   let tests = $state<LabTest[]>([]);
@@ -141,7 +141,7 @@
                   <p class="text-sm text-muted-foreground">{test.category} · {test.code}</p>
                 </div>
                 <div class="text-right">
-                  <p class="font-medium">₹{test.price}</p>
+                  <p class="font-medium">{formatCurrency(test.price)}</p>
                   <p class="text-xs text-muted-foreground">{test.normal_range || ""}</p>
                 </div>
               </div>

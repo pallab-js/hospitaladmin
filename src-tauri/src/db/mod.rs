@@ -35,10 +35,13 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     sqlx::query("PRAGMA foreign_keys=ON").execute(&pool).await?;
 
     if let Err(e) = run_migrations(&pool).await {
+        #[cfg(debug_assertions)]
         eprintln!(
             "[db] Migration failed: {}. Deleting stale database and retrying...",
             e
         );
+        #[cfg(not(debug_assertions))]
+        eprintln!("[db] Migration failed. Deleting stale database and retrying...");
         drop(pool);
         std::fs::remove_file(&db_path)?;
         // Re-init with fresh DB

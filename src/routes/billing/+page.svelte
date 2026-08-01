@@ -8,7 +8,7 @@
   import CardTitle from "$lib/components/ui/card/card-title.svelte";
   import CardContent from "$lib/components/ui/card/card-content.svelte";
   import Badge from "$lib/components/ui/badge/index.svelte";
-  import { DollarSign, CreditCard, FileText, AlertCircle } from "@lucide/svelte";
+  import { IndianRupee, CreditCard, FileText, AlertCircle } from "@lucide/svelte";
   import { formatCurrency, formatDate, getStatusColor, buildPatientMap } from "$lib/utils/index.js";
 
   let invoices = $state<Invoice[]>([]);
@@ -57,7 +57,7 @@
             <p class="text-sm text-muted-foreground">Revenue (Paid)</p>
             <p class="text-2xl font-bold text-success">{formatCurrency(totalRevenue)}</p>
           </div>
-          <DollarSign class="h-8 w-8 text-success" />
+          <IndianRupee class="h-8 w-8 text-success" />
         </div>
       </CardContent>
     </Card>

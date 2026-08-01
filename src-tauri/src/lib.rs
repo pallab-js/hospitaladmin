@@ -7,7 +7,6 @@ mod utils;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
@@ -21,6 +20,8 @@ pub fn run() {
             auth::commands::login,
             auth::commands::logout,
             auth::commands::get_current_user,
+            auth::commands::register,
+            auth::commands::change_password,
             commands::patients::create_patient,
             commands::patients::get_patients,
             commands::patients::get_patient_by_id,
@@ -53,6 +54,12 @@ pub fn run() {
             commands::dashboard::get_department_load,
             commands::dashboard::get_monthly_trends,
             commands::database::export_database,
+            commands::updates::update_my_profile,
+            commands::updates::update_patient,
+            commands::updates::update_bed,
+            commands::updates::update_medication,
+            commands::updates::update_inventory,
+            commands::updates::update_lab_result_entry,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

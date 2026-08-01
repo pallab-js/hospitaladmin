@@ -6,7 +6,7 @@
   import CardTitle from "$lib/components/ui/card/card-title.svelte";
   import CardContent from "$lib/components/ui/card/card-content.svelte";
   import Button from "$lib/components/ui/button/index.svelte";
-  import { BarChart3, Download, FileText, Users, Bed, DollarSign } from "@lucide/svelte";
+  import { BarChart3, Download, FileText, Users, Bed, IndianRupee } from "@lucide/svelte";
 
   function generateReport(title: string) {
     notifications.add({
@@ -20,7 +20,7 @@
     { title: "Daily Summary", description: "Overview of today's operations", icon: BarChart3 },
     { title: "Patient Demographics", description: "Age, gender, and blood group distribution", icon: Users },
     { title: "Bed Utilization", description: "Ward occupancy and bed usage statistics", icon: Bed },
-    { title: "Revenue Report", description: "Financial summary and payment analysis", icon: DollarSign },
+    { title: "Revenue Report", description: "Financial summary and payment analysis", icon: IndianRupee },
     { title: "Lab Test Summary", description: "Test orders and turnaround times", icon: FileText },
     { title: "Pharmacy Consumption", description: "Medication usage and stock levels", icon: Download },
   ];

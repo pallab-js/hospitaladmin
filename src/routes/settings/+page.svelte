@@ -2,7 +2,7 @@
   import { auth, userName, userRole } from "$lib/stores/auth.js";
   import { sidebar } from "$lib/stores/sidebar.js";
   import { notifications } from "$lib/stores/notifications.js";
-  import { updateMyProfile } from "$lib/lib/api.js";
+  import { updateMyProfile, changePassword } from "$lib/lib/api.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
   import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "$lib/components/ui/card/index.js";
   import Button from "$lib/components/ui/button/index.svelte";
@@ -86,14 +86,15 @@
     if (!validatePassword()) return;
     savingPassword = true;
     try {
-      await updateMyProfile({});
+      await changePassword(currentPassword, newPassword);
       notifications.add({ type: "success", title: "Password Updated", message: "Your password has been changed" });
       currentPassword = "";
       newPassword = "";
       confirmPassword = "";
       passwordErrors = {};
-    } catch (e) {
-      notifications.add({ type: "error", title: "Error", message: "Failed to update password" });
+    } catch (e: any) {
+      const message = e?.message || "Failed to update password";
+      notifications.add({ type: "error", title: "Error", message });
     } finally {
       savingPassword = false;
     }

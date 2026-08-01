@@ -1,7 +1,9 @@
-use super::session::{clear_session, get_session, set_session, Session};
+use super::session::{clear_user_session, get_session, set_session, Session};
 use crate::db::get_pool;
+use crate::utils::password::validate_password;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use uuid::Uuid;
 
 const MAX_FAILED_ATTEMPTS: i64 = 5;
 const LOCKOUT_MINUTES: i64 = 15;
@@ -33,6 +35,20 @@ pub struct UserInfo {
     pub full_name: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub password: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub role: String,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub department_id: Option<String>,
+    pub qualification: Option<String>,
+    pub specialization: Option<String>,
+}
+
 #[tauri::command]
 pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
     let pool = get_pool();
@@ -43,10 +59,17 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
     .bind(&request.username)
     .fetch_optional(pool)
     .await
-    .map_err(|e| format!("Database error: {}", e))?;
+    .map_err(|_| "Authentication service unavailable".to_string())?;
 
     match row {
         Some(row) => {
+            let password_hash: String = row.get("password_hash");
+
+            // Always run bcrypt to equalize timing across all branches
+            let valid = bcrypt::verify(&request.password, &password_hash)
+                .map_err(|_| "Authentication service unavailable".to_string())?;
+
+            // Check lockout AFTER bcrypt to prevent timing side-channel
             let locked_until: Option<String> = row.get("locked_until");
             if let Some(ref lock_time) = locked_until {
                 if let Ok(lock_dt) =
@@ -61,10 +84,6 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                     }
                 }
             }
-
-            let password_hash: String = row.get("password_hash");
-            let valid = bcrypt::verify(&request.password, &password_hash)
-                .map_err(|e| format!("Verification error: {}", e))?;
 
             if valid {
                 let user_id: String = row.get("id");
@@ -124,35 +143,29 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                     }),
                 })
             } else {
-                let failed_attempts: i64 = row.get("failed_attempts");
-                let new_count = failed_attempts + 1;
-
-                let lock_until = if new_count >= HARD_LOCKOUT_THRESHOLD {
-                    Some(
-                        (chrono::Local::now() + chrono::Duration::minutes(HARD_LOCKOUT_MINUTES))
-                            .format("%Y-%m-%d %H:%M:%S")
-                            .to_string(),
-                    )
-                } else if new_count >= MAX_FAILED_ATTEMPTS {
-                    Some(
-                        (chrono::Local::now() + chrono::Duration::minutes(LOCKOUT_MINUTES))
-                            .format("%Y-%m-%d %H:%M:%S")
-                            .to_string(),
-                    )
-                } else {
-                    None
-                };
-
-                sqlx::query("UPDATE users SET failed_attempts = ?, locked_until = COALESCE(?, locked_until) WHERE username = ?")
-                    .bind(new_count)
-                    .bind(&lock_until)
-                    .bind(&request.username)
-                    .execute(pool)
-                    .await
-                    .ok();
+                // Atomic increment + lockout calculation in a single query
+                sqlx::query(
+                    "UPDATE users SET
+                        failed_attempts = failed_attempts + 1,
+                        locked_until = CASE
+                            WHEN failed_attempts + 1 >= ? THEN datetime('now', '+' || ? || ' minutes')
+                            WHEN failed_attempts + 1 >= ? THEN datetime('now', '+' || ? || ' minutes')
+                            ELSE locked_until
+                        END
+                    WHERE username = ?",
+                )
+                .bind(HARD_LOCKOUT_THRESHOLD)
+                .bind(HARD_LOCKOUT_MINUTES)
+                .bind(MAX_FAILED_ATTEMPTS)
+                .bind(LOCKOUT_MINUTES)
+                .bind(&request.username)
+                .execute(pool)
+                .await
+                .ok();
 
                 // Log failed attempt
                 if let Some(ref user_id_val) = row.get::<Option<String>, _>("id") {
+                    let failed_attempts: i64 = row.get("failed_attempts");
                     crate::utils::audit::log_audit(
                         &Session {
                             user_id: user_id_val.clone(),
@@ -164,7 +177,7 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                         "login_failed",
                         "user",
                         Some(user_id_val),
-                        Some(&format!("attempts={}", new_count)),
+                        Some(&format!("attempts={}", failed_attempts + 1)),
                     )
                     .await;
                 }
@@ -191,7 +204,9 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
 
 #[tauri::command]
 pub async fn logout() -> Result<(), String> {
-    clear_session();
+    if let Some(session) = get_session() {
+        clear_user_session(&session.user_id);
+    }
     Ok(())
 }
 
@@ -226,4 +241,152 @@ pub async fn get_current_user() -> Result<Option<UserInfo>, String> {
         }
         None => Ok(None),
     }
+}
+
+#[tauri::command]
+pub async fn register(request: RegisterRequest) -> Result<LoginResponse, String> {
+    crate::auth::guards::admin_only()?;
+    let pool = get_pool();
+
+    // Validate inputs
+    if request.username.trim().is_empty() {
+        return Err("Username is required".into());
+    }
+    if request.username.len() < 3 || request.username.len() > 50 {
+        return Err("Username must be 3-50 characters".into());
+    }
+    if !request.username.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err("Username must contain only letters, numbers, and underscores".into());
+    }
+    validate_password(&request.password)?;
+    if request.first_name.trim().is_empty() {
+        return Err("First name is required".into());
+    }
+    if request.last_name.trim().is_empty() {
+        return Err("Last name is required".into());
+    }
+
+    let valid_roles = ["doctor", "nurse", "receptionist", "pharmacist", "lab_tech", "billing_staff"];
+    if !valid_roles.contains(&request.role.as_str()) {
+        return Err("Invalid role".into());
+    }
+
+    // Check username uniqueness
+    let existing: Option<String> = sqlx::query_scalar("SELECT id FROM users WHERE username = ?")
+        .bind(&request.username)
+        .fetch_optional(pool)
+        .await
+        .map_err(|_| "Registration service unavailable".to_string())?;
+    if existing.is_some() {
+        return Err("Username already taken".into());
+    }
+
+    let user_id = Uuid::new_v4().to_string();
+    let staff_id = Uuid::new_v4().to_string();
+    let password_hash = bcrypt::hash(&request.password, 12)
+        .map_err(|_| "Registration service unavailable".to_string())?;
+
+    let mut tx = pool.begin().await.map_err(|_| "Registration service unavailable".to_string())?;
+
+    // Create staff record
+    sqlx::query(
+        "INSERT INTO staff (id, first_name, last_name, role, department_id, email, phone, qualification, specialization, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)"
+    )
+    .bind(&staff_id)
+    .bind(request.first_name.trim())
+    .bind(request.last_name.trim())
+    .bind(&request.role)
+    .bind(&request.department_id)
+    .bind(&request.email)
+    .bind(&request.phone)
+    .bind(&request.qualification)
+    .bind(&request.specialization)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| "Failed to create staff profile".to_string())?;
+
+    // Create user account
+    sqlx::query(
+        "INSERT INTO users (id, username, password_hash, role, employee_id, is_active)
+         VALUES (?, ?, ?, ?, ?, 1)"
+    )
+    .bind(&user_id)
+    .bind(&request.username)
+    .bind(&password_hash)
+    .bind(&request.role)
+    .bind(&staff_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| "Failed to create user account".to_string())?;
+
+    tx.commit().await.map_err(|_| "Registration failed".to_string())?;
+
+    let full_name = format!("{} {}", request.first_name.trim(), request.last_name.trim());
+
+    Ok(LoginResponse {
+        success: true,
+        message: "Registration successful".to_string(),
+        user: Some(UserInfo {
+            id: user_id,
+            username: request.username,
+            role: request.role,
+            employee_id: Some(staff_id),
+            full_name: Some(full_name),
+        }),
+    })
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[tauri::command]
+pub async fn change_password(request: ChangePasswordRequest) -> Result<(), String> {
+    let session = crate::auth::guards::authenticated()?;
+    let pool = get_pool();
+
+    // Validate new password
+    validate_password(&request.new_password)?;
+
+    if request.current_password == request.new_password {
+        return Err("New password must be different from current password".into());
+    }
+
+    // Fetch current password hash
+    let row = sqlx::query("SELECT password_hash FROM users WHERE id = ? AND is_active = 1")
+        .bind(&session.user_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|_| "Service unavailable".to_string())?
+        .ok_or("User not found".to_string())?;
+
+    let password_hash: String = row.get("password_hash");
+
+    // Verify current password
+    let valid = bcrypt::verify(&request.current_password, &password_hash)
+        .map_err(|_| "Service unavailable".to_string())?;
+
+    if !valid {
+        return Err("Current password is incorrect".into());
+    }
+
+    // Hash new password
+    let new_hash = bcrypt::hash(&request.new_password, 12)
+        .map_err(|_| "Service unavailable".to_string())?;
+
+    // Update password
+    sqlx::query("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(&new_hash)
+        .bind(&session.user_id)
+        .execute(pool)
+        .await
+        .map_err(|_| "Failed to update password".to_string())?;
+
+    // Invalidate all sessions for this user except current
+    clear_user_session(&session.user_id);
+
+    Ok(())
 }

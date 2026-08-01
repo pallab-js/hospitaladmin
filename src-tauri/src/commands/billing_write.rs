@@ -52,7 +52,7 @@ pub struct RecordPaymentRequest {
 
 #[tauri::command]
 pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWithPatient, String> {
-    let session = guards::authenticated()?;
+    let session = guards::admin_only()?;
     let pool = get_pool();
     let id = Uuid::new_v4().to_string();
     let invoice_number = generate_invoice_number().await?;
@@ -64,6 +64,9 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
         .map(|i| i.unit_price * (i.quantity.unwrap_or(1) as f64))
         .sum();
     let tax_rate = request.tax_rate.unwrap_or(0.1);
+    if tax_rate < 0.0 || tax_rate > 1.0 {
+        return Err("Tax rate must be between 0.0 and 1.0".to_string());
+    }
     let tax = subtotal * tax_rate;
     let discount = request.discount.unwrap_or(0.0);
     let total = subtotal + tax - discount;
@@ -141,7 +144,7 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
 
 #[tauri::command]
 pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String> {
-    let session = guards::authenticated()?;
+    let session = guards::admin_only()?;
     let pool = get_pool();
     let id = Uuid::new_v4().to_string();
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();

@@ -75,6 +75,11 @@ pub async fn create_admission(
         .admission_type
         .unwrap_or_else(|| "planned".to_string());
 
+    let valid_admission_types = ["emergency", "planned", "transfer", "observation"];
+    if !valid_admission_types.contains(&admission_type.as_str()) {
+        return Err("Invalid admission type".to_string());
+    }
+
     let mut tx = pool
         .begin()
         .await

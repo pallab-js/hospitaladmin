@@ -1,5 +1,6 @@
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::sync::{LazyLock, Mutex};
+use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const SESSION_EXPIRY_SECONDS: u64 = 3600; // 1 hour
@@ -19,7 +20,7 @@ struct SessionEntry {
     expires_at: u64,
 }
 
-static CURRENT_SESSION: LazyLock<Mutex<Option<SessionEntry>>> = LazyLock::new(|| Mutex::new(None));
+static SESSIONS: LazyLock<DashMap<String, SessionEntry>> = LazyLock::new(DashMap::new);
 
 fn now_epoch() -> u64 {
     SystemTime::now()
@@ -36,52 +37,51 @@ pub fn set_session(session: Session) {
         },
         expires_at: now_epoch() + SESSION_EXPIRY_SECONDS,
     };
-    if let Ok(mut s) = CURRENT_SESSION.lock() {
-        *s = Some(entry);
-    }
+    SESSIONS.insert(entry.session.user_id.clone(), entry);
 }
 
 pub fn get_session() -> Option<Session> {
-    let s = CURRENT_SESSION.lock().ok()?;
-    match &*s {
-        Some(entry) => {
-            if now_epoch() > entry.expires_at {
-                None
-            } else {
-                Some(entry.session.clone())
-            }
+    // Purge expired sessions on read (cheap sweep)
+    let now = now_epoch();
+    SESSIONS.retain(|_, entry| now <= entry.expires_at);
+
+    // For the current session model we return the first active session.
+    // In a multi-user desktop app, this should be keyed by a window/context ID.
+    // For now we iterate — DashMap makes this lock-free.
+    SESSIONS.iter().find_map(|entry| {
+        if now <= entry.value().expires_at {
+            Some(entry.value().session.clone())
+        } else {
+            None
         }
-        None => None,
-    }
+    })
 }
 
 /// Refresh session expiry on activity. Returns true if refreshed.
 pub fn refresh_session() -> bool {
-    if let Ok(mut s) = CURRENT_SESSION.lock() {
-        if let Some(ref mut entry) = *s {
-            if now_epoch() <= entry.expires_at {
-                entry.expires_at = now_epoch() + SESSION_EXPIRY_SECONDS;
-                return true;
-            }
+    let now = now_epoch();
+    let mut refreshed = false;
+    for mut entry in SESSIONS.iter_mut() {
+        if now <= entry.value().expires_at {
+            entry.value_mut().expires_at = now + SESSION_EXPIRY_SECONDS;
+            refreshed = true;
         }
     }
-    false
+    refreshed
 }
 
-pub fn clear_session() {
-    if let Ok(mut s) = CURRENT_SESSION.lock() {
-        *s = None;
-    }
+pub fn clear_user_session(user_id: &str) {
+    SESSIONS.remove(user_id);
 }
 
 pub fn require_session() -> Result<Session, String> {
     get_session().ok_or_else(|| "Session expired or not authenticated".to_string())
 }
 
-// ponytail: management always bypasses role checks — documented in guards.rs role matrix
+// ponytail: admin always bypasses role checks — documented in guards.rs role matrix
 pub fn require_role(role: &str) -> Result<Session, String> {
     let session = require_session()?;
-    if session.role != role && session.role != "management" {
+    if session.role != role && session.role != "admin" {
         return Err("Insufficient permissions".to_string());
     }
     Ok(session)

@@ -32,7 +32,7 @@
     Users,
     Calendar,
     Bed,
-    DollarSign,
+    IndianRupee,
     TestTube,
     Activity,
     UserCheck,
@@ -98,7 +98,7 @@
   title="Welcome back, {$userName}"
   description={$userRole === "doctor"
     ? "Here's your clinical overview for today."
-    : $userRole === "management"
+    : $userRole === "admin"
       ? "Here's the hospital overview for today."
       : "Here's your operational overview for today."}
 >
@@ -114,14 +114,14 @@
       {/each}
     </div>
   {:else}
-    <!-- ═══════════════ MANAGEMENT DASHBOARD ═══════════════ -->
-    {#if $userRole === "management"}
+    <!-- ═══════════════ ADMIN DASHBOARD ═══════════════ -->
+    {#if $userRole === "admin"}
       <!-- KPI Row -->
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard title="Patients Today" value={stats?.total_patients_today ?? 0} change="+12% from yesterday" changeType="positive" icon={Users} />
         <KPICard title="Appointments" value={stats?.total_appointments_today ?? 0} change="Scheduled today" changeType="neutral" icon={Calendar} />
         <KPICard title="Bed Occupancy" value="{(stats?.bed_occupancy_rate ?? 0).toFixed(1)}%" change={stats && stats.bed_occupancy_rate > 80 ? "High" : "Normal"} changeType={stats && stats.bed_occupancy_rate > 80 ? "negative" : "positive"} icon={Bed} />
-        <KPICard title="Revenue Today" value={formatCurrency(stats?.revenue_today ?? 0)} change="Collected" changeType="positive" icon={DollarSign} />
+        <KPICard title="Revenue Today" value={formatCurrency(stats?.revenue_today ?? 0)} change="Collected" changeType="positive" icon={IndianRupee} />
       </div>
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard title="Pending Labs" value={stats?.pending_lab_orders ?? 0} change="Awaiting results" changeType={stats && stats.pending_lab_orders > 5 ? "negative" : "neutral"} icon={TestTube} />
@@ -210,7 +210,7 @@
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle class="flex items-center gap-2"><DollarSign class="h-5 w-5" /> Recent Invoices</CardTitle>
+            <CardTitle class="flex items-center gap-2"><IndianRupee class="h-5 w-5" /> Recent Invoices</CardTitle>
           </CardHeader>
           <CardContent>
             {#if invoices.length > 0}
@@ -253,7 +253,7 @@
               <div><p class="font-medium text-sm">Ward Status</p></div>
             </a>
             <a href="/billing" class="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent transition-colors">
-              <DollarSign class="h-5 w-5 text-primary" />
+              <IndianRupee class="h-5 w-5 text-primary" />
               <div><p class="font-medium text-sm">Billing</p></div>
             </a>
             <a href="/reports" class="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent transition-colors">
@@ -500,10 +500,14 @@
       <Card>
         <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
         <CardContent>
-          <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <a href="/patients" class="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent transition-colors">
               <Users class="h-5 w-5 text-primary" />
               <div><p class="font-medium text-sm">Patients</p></div>
+            </a>
+            <a href="/appointments" class="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent transition-colors">
+              <Calendar class="h-5 w-5 text-primary" />
+              <div><p class="font-medium text-sm">Appointments</p></div>
             </a>
             <a href="/wards" class="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent transition-colors">
               <Bed class="h-5 w-5 text-primary" />
@@ -512,14 +516,6 @@
             <a href="/lab" class="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent transition-colors">
               <TestTube class="h-5 w-5 text-primary" />
               <div><p class="font-medium text-sm">Lab</p></div>
-            </a>
-            <a href="/pharmacy" class="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent transition-colors">
-              <Pill class="h-5 w-5 text-primary" />
-              <div><p class="font-medium text-sm">Pharmacy</p></div>
-            </a>
-            <a href="/billing" class="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent transition-colors">
-              <DollarSign class="h-5 w-5 text-primary" />
-              <div><p class="font-medium text-sm">Billing</p></div>
             </a>
           </div>
         </CardContent>

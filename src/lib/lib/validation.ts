@@ -14,7 +14,8 @@ export const registerSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .regex(/[a-z]/, "Password must contain a lowercase letter")
     .regex(/[A-Z]/, "Password must contain an uppercase letter")
-    .regex(/[0-9]/, "Password must contain a digit"),
+    .regex(/[0-9]/, "Password must contain a digit")
+    .regex(/[^a-zA-Z0-9]/, "Password must contain a special character"),
   first_name: z.string().min(1, "First name is required").max(100, "First name must be 100 characters or less"),
   last_name: z.string().min(1, "Last name is required").max(100, "Last name must be 100 characters or less"),
   role: z.enum(["admin", "doctor", "nurse", "receptionist", "pharmacist", "lab_tech", "billing_staff"], {
@@ -76,7 +77,8 @@ export const passwordChangeSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .regex(/[a-z]/, "Must contain a lowercase letter")
     .regex(/[A-Z]/, "Must contain an uppercase letter")
-    .regex(/[0-9]/, "Must contain a digit"),
+    .regex(/[0-9]/, "Must contain a digit")
+    .regex(/[^a-zA-Z0-9]/, "Must contain a special character"),
   confirm_password: z.string().min(1, "Please confirm your password"),
 }).refine((data) => data.new_password === data.confirm_password, {
   message: "Passwords do not match",
