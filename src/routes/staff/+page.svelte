@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getStaffList } from "$lib/lib/api.js";
-  import type { Staff } from "$lib/lib/types.js";
+  import type { Staff, UserRole } from "$lib/lib/types.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
   import Card from "$lib/components/ui/card/index.svelte";
   import CardHeader from "$lib/components/ui/card/card-header.svelte";
@@ -17,7 +17,7 @@
   let staff = $state<Staff[]>([]);
   let loading = $state(true);
   let search = $state("");
-  let filterRole = $state("all");
+  let filterRole = $state<UserRole | "all">("all");
 
   onMount(async () => {
     try {
@@ -119,6 +119,8 @@
             <option value="pharmacist">Pharmacists</option>
             <option value="lab_tech">Lab Techs</option>
             <option value="receptionist">Receptionists</option>
+            <option value="billing_staff">Billing Staff</option>
+            <option value="admin">Admins</option>
           </select>
         </div>
       </div>

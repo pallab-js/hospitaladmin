@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getAppointments } from "$lib/lib/api.js";
+  import { userRole } from "$lib/stores/auth.js";
   import type { AppointmentWithDetails } from "$lib/lib/types.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
   import Button from "$lib/components/ui/button/index.svelte";
@@ -9,6 +10,10 @@
   import Table from "$lib/components/ui/table/index.svelte"; import TableHeader from "$lib/components/ui/table/table-header.svelte"; import TableBody from "$lib/components/ui/table/table-body.svelte"; import TableRow from "$lib/components/ui/table/table-row.svelte"; import TableHead from "$lib/components/ui/table/table-head.svelte"; import TableCell from "$lib/components/ui/table/table-cell.svelte";
   import { Plus, Calendar, Clock, ChevronLeft, ChevronRight } from "@lucide/svelte";
   import { formatDate, formatTime, getStatusColor, getStatusLabel } from "$lib/utils/index.js";
+
+  const canBookAppointment = $derived(
+    $userRole === "admin" || $userRole === "doctor" || $userRole === "receptionist"
+  );
 
   let appointments = $state<AppointmentWithDetails[]>([]);
   let loading = $state(true);
@@ -45,12 +50,14 @@
 
 <PageLayout title="Appointments" description="Manage patient appointments and scheduling">
   {#snippet actions()}
-    <a href="/appointments/new">
-      <Button>
-        <Plus class="h-4 w-4 mr-2" />
-        Book Appointment
-      </Button>
-    </a>
+    {#if canBookAppointment}
+      <a href="/appointments/new">
+        <Button>
+          <Plus class="h-4 w-4 mr-2" />
+          Book Appointment
+        </Button>
+      </a>
+    {/if}
   {/snippet}
 
   <Card>

@@ -1,7 +1,9 @@
+export type UserRole = "admin" | "doctor" | "nurse" | "receptionist" | "pharmacist" | "lab_tech" | "billing_staff" | "staff";
+
 export interface User {
   id: string;
   username: string;
-  role: "doctor" | "management" | "staff";
+  role: UserRole;
   employee_id: string | null;
   full_name: string | null;
 }
@@ -32,7 +34,7 @@ export interface Staff {
   id: string;
   first_name: string;
   last_name: string;
-  role: string;
+  role: UserRole;
   department_id: string | null;
   email: string | null;
   phone: string | null;
@@ -198,8 +200,6 @@ export interface MonthlyTrend {
   revenue: number;
   admissions: number;
 }
-
-export type UserRole = "doctor" | "management" | "staff";
 
 export interface NavItem {
   title: string;

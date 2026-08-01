@@ -28,9 +28,9 @@
     { title: "Wards & Beds", href: "/wards", icon: Building2 },
     { title: "Lab & Diagnostics", href: "/lab", icon: TestTube },
     { title: "Pharmacy", href: "/pharmacy", icon: Pill },
-    { title: "Billing", href: "/billing", icon: Receipt },
+    { title: "Billing", href: "/billing", icon: Receipt, roles: ["admin" as const, "billing_staff" as const] },
     { title: "Staff", href: "/staff", icon: UserCog, roles: ["admin" as const] },
-    { title: "Reports", href: "/reports", icon: BarChart3 },
+    { title: "Reports", href: "/reports", icon: BarChart3, roles: ["admin" as const, "billing_staff" as const] },
     { title: "Settings", href: "/settings", icon: Settings },
   ];
 
