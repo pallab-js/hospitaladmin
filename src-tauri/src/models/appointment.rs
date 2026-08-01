@@ -60,6 +60,11 @@ impl CreateAppointmentRequest {
                 return Err("Invalid visit type".to_string());
             }
         }
+        if let Some(ref reason) = self.reason {
+            if reason.len() > 1000 {
+                return Err("Reason must be 1000 characters or less".to_string());
+            }
+        }
         Ok(())
     }
 }

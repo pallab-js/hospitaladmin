@@ -2,12 +2,13 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import { auth, isAuthenticated } from "$lib/stores/auth.js";
+  import { auth, isAuthenticated, userRole } from "$lib/stores/auth.js";
   import { sidebar } from "$lib/stores/sidebar.js";
   import { getCurrentUser } from "$lib/lib/api.js";
   import Sidebar from "$lib/components/layout/Sidebar.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Toast from "$lib/components/ui/toast/index.svelte";
+  import type { UserRole } from "$lib/lib/types";
   import "../app.css";
 
   let { children } = $props();
@@ -15,6 +16,12 @@
 
   const publicRoutes = ["/login"];
   const isPublicRoute = $derived(publicRoutes.includes($page.url.pathname));
+
+  const routeRoles: Record<string, UserRole[]> = {
+    "/staff": ["admin"],
+    "/billing": ["admin", "billing_staff"],
+    "/reports": ["admin", "billing_staff"],
+  };
 
   onMount(async () => {
     try {
@@ -32,6 +39,18 @@
   $effect(() => {
     if (!loading && !$isAuthenticated && !isPublicRoute) {
       goto("/login");
+    }
+  });
+
+  $effect(() => {
+    if (!loading && $isAuthenticated && $userRole) {
+      const path = $page.url.pathname;
+      const allowedRoles = Object.entries(routeRoles).find(([prefix]) =>
+        path === prefix || path.startsWith(prefix + "/")
+      )?.[1];
+      if (allowedRoles && !allowedRoles.includes($userRole as UserRole)) {
+        goto("/dashboard");
+      }
     }
   });
 </script>

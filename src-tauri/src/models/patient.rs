@@ -66,13 +66,43 @@ impl CreatePatientRequest {
             return Err("Gender must be male, female, or other".to_string());
         }
         if let Some(ref email) = self.email {
-            if !email.is_empty() && !email.contains('@') {
-                return Err("Invalid email format".to_string());
+            if !email.is_empty() {
+                if !email.contains('@') {
+                    return Err("Invalid email format".to_string());
+                }
+                if email.len() > 254 {
+                    return Err("Email must be 254 characters or less".to_string());
+                }
             }
         }
         if let Some(ref phone) = self.phone {
             if phone.len() > 20 {
                 return Err("Phone number must be 20 characters or less".to_string());
+            }
+        }
+        if let Some(ref address) = self.address {
+            if address.len() > 500 {
+                return Err("Address must be 500 characters or less".to_string());
+            }
+        }
+        if let Some(ref emergency_name) = self.emergency_contact_name {
+            if emergency_name.len() > 200 {
+                return Err("Emergency contact name must be 200 characters or less".to_string());
+            }
+        }
+        if let Some(ref emergency_phone) = self.emergency_contact_phone {
+            if emergency_phone.len() > 20 {
+                return Err("Emergency contact phone must be 20 characters or less".to_string());
+            }
+        }
+        if let Some(ref allergies) = self.allergies {
+            if allergies.len() > 2000 {
+                return Err("Allergies must be 2000 characters or less".to_string());
+            }
+        }
+        if let Some(ref history) = self.medical_history {
+            if history.len() > 5000 {
+                return Err("Medical history must be 5000 characters or less".to_string());
             }
         }
         Ok(())

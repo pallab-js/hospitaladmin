@@ -44,17 +44,12 @@ pub async fn seed(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
     println!("[seed] Database seeded successfully!");
     #[cfg(debug_assertions)]
     {
-        println!(
-            "[seed] Credentials written to hms-credentials.log (check the app data directory)"
-        );
-        let log_path = std::env::temp_dir().join("hms-credentials.log");
-        let mut log_content =
-            String::from("[seed] === INITIAL CREDENTIALS (CHANGE THESE IMMEDIATELY) ===\n");
+        eprintln!("[seed] === INITIAL CREDENTIALS (CHANGE THESE IMMEDIATELY) ===");
         for (username, password) in &credentials {
-            log_content.push_str(&format!("[seed]   {} / {}\n", username, password));
+            eprintln!("[seed]   {} / {}", username, password);
         }
-        log_content.push_str("[seed] ========================================================\n");
-        let _ = std::fs::write(&log_path, log_content);
+        eprintln!("[seed] ========================================================");
+        eprintln!("[seed] WARNING: These credentials are only shown once. Save them now.");
     }
     Ok(())
 }

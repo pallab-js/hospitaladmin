@@ -13,7 +13,7 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let app_dir = app
         .path()
         .app_data_dir()
-        .expect("Failed to get app data dir");
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
     std::fs::create_dir_all(&app_dir)?;
 
     let db_path = app_dir.join("hms.db");
@@ -68,14 +68,14 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         seed::seed(&pool).await?;
         DB_POOL
             .set(pool)
-            .expect("Database pool already initialized");
+            .map_err(|_| "Database pool already initialized".to_string())?;
     }
 
     Ok(())
 }
 
 pub fn get_pool() -> &'static SqlitePool {
-    DB_POOL.get().expect("Database pool not initialized")
+    DB_POOL.get().expect("Database pool not initialized — app must call db::init() first")
 }
 
 async fn run_migrations(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {

@@ -95,13 +95,17 @@ pub async fn get_dashboard_stats() -> Result<DashboardStats, String> {
     let total_beds: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM beds")
         .fetch_one(pool)
         .await
-        .unwrap_or(1);
+        .map_err(|e| format!("Failed to count beds: {}", e))?;
     let occupied_beds: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM beds WHERE status = 'occupied'")
             .fetch_one(pool)
             .await
-            .unwrap_or(0);
-    let bed_occupancy_rate = (occupied_beds as f64 / total_beds as f64) * 100.0;
+            .map_err(|e| format!("Failed to count occupied beds: {}", e))?;
+    let bed_occupancy_rate = if total_beds > 0 {
+        (occupied_beds as f64 / total_beds as f64) * 100.0
+    } else {
+        0.0
+    };
 
     let revenue_today: f64 = if session.role == "admin" {
         sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date = ?")
@@ -119,14 +123,14 @@ pub async fn get_dashboard_stats() -> Result<DashboardStats, String> {
     .bind(&today)
     .fetch_one(pool)
     .await
-    .unwrap_or(0);
+    .map_err(|e| format!("Failed to count staff on duty: {}", e))?;
 
     let patients_registered_this_month: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM patients WHERE created_at >= ?")
             .bind(&month_start)
             .fetch_one(pool)
             .await
-            .unwrap_or(0);
+            .map_err(|e| format!("Failed to count monthly patients: {}", e))?;
 
     Ok(DashboardStats {
         total_patients_today,
