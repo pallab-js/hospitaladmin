@@ -51,3 +51,4 @@ vite.config.ts.timestamp-*
 *.db
 *.db-journal
 *.db-wal
+session-ses_010c.md
