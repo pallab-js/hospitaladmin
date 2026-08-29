@@ -67,6 +67,7 @@ pub fn billing_only() -> Result<Session, String> {
     Ok(session)
 }
 
+#[allow(dead_code)]
 pub fn nurse_only() -> Result<Session, String> {
     let session = require_session()?;
     if session.role != "nurse" && session.role != "admin" {
