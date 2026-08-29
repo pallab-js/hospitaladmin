@@ -11,10 +11,17 @@ const MAX_CONTACT_NAME_LEN: usize = 200;
 const MAX_TEXT_LEN: usize = 2000;
 const MAX_LONG_TEXT_LEN: usize = 5000;
 
-fn validate_optional_str(value: &Option<String>, max_len: usize, field_name: &str) -> Result<(), String> {
+fn validate_optional_str(
+    value: &Option<String>,
+    max_len: usize,
+    field_name: &str,
+) -> Result<(), String> {
     if let Some(ref v) = value {
         if v.len() > max_len {
-            return Err(format!("{} must be {} characters or less", field_name, max_len));
+            return Err(format!(
+                "{} must be {} characters or less",
+                field_name, max_len
+            ));
         }
     }
     Ok(())
@@ -26,7 +33,10 @@ fn validate_optional_email(value: &Option<String>) -> Result<(), String> {
             return Err("Invalid email format".to_string());
         }
         if v.len() > MAX_EMAIL_LEN {
-            return Err(format!("Email must be {} characters or less", MAX_EMAIL_LEN));
+            return Err(format!(
+                "Email must be {} characters or less",
+                MAX_EMAIL_LEN
+            ));
         }
     }
     Ok(())
@@ -183,10 +193,22 @@ pub async fn update_patient(request: UpdatePatientRequest) -> Result<(), String>
     validate_optional_str(&request.phone, MAX_PHONE_LEN, "Phone")?;
     validate_optional_email(&request.email)?;
     validate_optional_str(&request.address, MAX_ADDRESS_LEN, "Address")?;
-    validate_optional_str(&request.emergency_contact_name, MAX_CONTACT_NAME_LEN, "Emergency contact name")?;
-    validate_optional_str(&request.emergency_contact_phone, MAX_PHONE_LEN, "Emergency contact phone")?;
+    validate_optional_str(
+        &request.emergency_contact_name,
+        MAX_CONTACT_NAME_LEN,
+        "Emergency contact name",
+    )?;
+    validate_optional_str(
+        &request.emergency_contact_phone,
+        MAX_PHONE_LEN,
+        "Emergency contact phone",
+    )?;
     validate_optional_str(&request.allergies, MAX_TEXT_LEN, "Allergies")?;
-    validate_optional_str(&request.medical_history, MAX_LONG_TEXT_LEN, "Medical history")?;
+    validate_optional_str(
+        &request.medical_history,
+        MAX_LONG_TEXT_LEN,
+        "Medical history",
+    )?;
 
     let mut sets = Vec::new();
     if request.first_name.is_some() {
@@ -292,7 +314,13 @@ pub async fn update_bed(request: UpdateWardBedRequest) -> Result<(), String> {
 
     // Validate status if provided
     if let Some(ref status) = request.status {
-        let valid_statuses = ["available", "occupied", "reserved", "cleaning", "maintenance"];
+        let valid_statuses = [
+            "available",
+            "occupied",
+            "reserved",
+            "cleaning",
+            "maintenance",
+        ];
         if !valid_statuses.contains(&status.as_str()) {
             return Err("Invalid bed status".into());
         }

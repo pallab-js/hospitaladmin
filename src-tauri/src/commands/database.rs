@@ -52,8 +52,7 @@ pub async fn export_database(path: String) -> Result<String, String> {
         .await
         .map_err(|_| "Failed to checkpoint WAL".to_string())?;
 
-    std::fs::copy(db_path, &dest)
-        .map_err(|e| format!("Failed to copy database: {}", e))?;
+    std::fs::copy(db_path, &dest).map_err(|e| format!("Failed to copy database: {}", e))?;
 
     // Also copy the WAL and SHM files if they exist (for a consistent snapshot)
     let wal_path = PathBuf::from(format!("{}-wal", db_path.display()));

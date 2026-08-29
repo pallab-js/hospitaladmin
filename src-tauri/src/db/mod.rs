@@ -55,10 +55,7 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         if let Err(backup_err) = std::fs::copy(&db_path, &backup_path) {
             eprintln!("[db] Warning: failed to create backup: {}", backup_err);
         } else {
-            eprintln!(
-                "[db] Backup saved to {}",
-                backup_path.display()
-            );
+            eprintln!("[db] Backup saved to {}", backup_path.display());
         }
 
         std::fs::remove_file(&db_path)?;

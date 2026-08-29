@@ -88,12 +88,13 @@ pub async fn create_admission(
     // Atomic check-and-update to prevent race condition on bed allocation.
     // This UPDATE only succeeds if the bed is currently available, and returns
     // the number of affected rows. If 0, the bed was already taken.
-    let affected = sqlx::query("UPDATE beds SET status = 'occupied' WHERE id = ? AND status = 'available'")
-        .bind(&request.bed_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| "Failed to update bed status".to_string())?
-        .rows_affected();
+    let affected =
+        sqlx::query("UPDATE beds SET status = 'occupied' WHERE id = ? AND status = 'available'")
+            .bind(&request.bed_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| "Failed to update bed status".to_string())?
+            .rows_affected();
 
     if affected == 0 {
         return Err("Bed is not available (already occupied or does not exist)".to_string());

@@ -32,7 +32,10 @@ pub async fn get_lab_tests() -> Result<Vec<LabTest>, String> {
 }
 
 #[tauri::command]
-pub async fn get_lab_orders(page: Option<i64>, limit: Option<i64>) -> Result<Vec<LabOrderRow>, String> {
+pub async fn get_lab_orders(
+    page: Option<i64>,
+    limit: Option<i64>,
+) -> Result<Vec<LabOrderRow>, String> {
     guards::authenticated()?;
     let pool = db::get_pool();
     let page = page.unwrap_or(1).max(1);
