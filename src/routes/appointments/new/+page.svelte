@@ -2,7 +2,6 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { createAppointment, getPatients, getDoctors } from "$lib/lib/api.js";
-  import { notifications } from "$lib/stores/notifications.js";
   import { appointmentSchema } from "$lib/lib/validation.js";
   import type { Patient } from "$lib/lib/types.js";
   import { onMount } from "svelte";
@@ -69,18 +68,9 @@
         ...form,
         department_id: selectedDoctor?.department_id || undefined,
       });
-      notifications.add({
-        type: "success",
-        title: "Appointment Booked",
-        message: `Scheduled for ${form.appointment_date} at ${form.appointment_time}`,
-      });
       goto("/appointments");
     } catch (e) {
-      notifications.add({
-        type: "error",
-        title: "Booking Failed",
-        message: "An error occurred while booking the appointment",
-      });
+      // Error handled by UI state
     } finally {
       loading = false;
     }

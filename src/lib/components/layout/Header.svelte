@@ -2,11 +2,11 @@
   import { page } from "$app/stores";
   import { auth, userName, userRole } from "$lib/stores/auth.js";
   import { sidebar } from "$lib/stores/sidebar.js";
-  import { notifications } from "$lib/stores/notifications.js";
-  import { Search, Bell, Menu } from "@lucide/svelte";
+  import { Search, Menu } from "@lucide/svelte";
   import Avatar from "$lib/components/ui/avatar/index.svelte";
   import AvatarFallback from "$lib/components/ui/avatar/avatar-fallback.svelte";
   import Button from "$lib/components/ui/button/index.svelte";
+  import { getInitials } from "$lib/utils/index.js";
 
   const breadcrumbs = $derived(
     $page.url.pathname
@@ -19,23 +19,11 @@
       }))
   );
 
-  const unreadCount = $derived($notifications.length);
-
-  function getInitials(name: string): string {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  }
-
   let searchQuery = $state("");
   let showSearch = $state(false);
 
   function handleSearch() {
     if (searchQuery.trim()) {
-      notifications.add({ type: "info", title: "Search", message: `Searching for "${searchQuery}"...` });
       searchQuery = "";
       showSearch = false;
     }
@@ -81,14 +69,6 @@
         <Search class="h-5 w-5" />
       </Button>
     {/if}
-
-    <!-- Notifications -->
-    <Button variant="ghost" size="icon" class="relative" onclick={() => notifications.add({ type: "info", title: "Notifications", message: "No new notifications" })} aria-label="Notifications">
-      <Bell class="h-5 w-5" />
-      {#if unreadCount > 0}
-        <span class="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground flex items-center justify-center">{unreadCount > 9 ? "9+" : unreadCount}</span>
-      {/if}
-    </Button>
 
     <!-- User menu -->
     <div class="flex items-center gap-3">

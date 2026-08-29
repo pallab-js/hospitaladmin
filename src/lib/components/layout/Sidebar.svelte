@@ -163,7 +163,7 @@
         <div class="border-t border-sidebar-border p-3">
           <button
             class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-            onclick={handleLogout}
+            onclick={() => { sidebar.closeMobile(); handleLogout(); }}
           >
             <LogOut class="h-5 w-5 shrink-0" />
             <span>Logout</span>

@@ -5,31 +5,31 @@
   let { status, class: className }: { status: string; class?: string } = $props();
 
   const statusStyles: Record<string, string> = {
-    scheduled: "bg-blue-100 text-blue-800",
-    confirmed: "bg-green-100 text-green-800",
-    in_progress: "bg-yellow-100 text-yellow-800",
-    completed: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
-    no_show: "bg-gray-100 text-gray-800",
-    ordered: "bg-blue-100 text-blue-800",
-    paid: "bg-green-100 text-green-800",
-    pending: "bg-yellow-100 text-yellow-800",
-    partial: "bg-orange-100 text-orange-800",
-    overdue: "bg-red-100 text-red-800",
-    available: "bg-green-100 text-green-800",
-    occupied: "bg-red-100 text-red-800",
-    reserved: "bg-yellow-100 text-yellow-800",
-    cleaning: "bg-blue-100 text-blue-800",
-    maintenance: "bg-gray-100 text-gray-800",
-    active: "bg-green-100 text-green-800",
-    discharged: "bg-gray-100 text-gray-800",
-    transferred: "bg-purple-100 text-purple-800",
-    routine: "bg-blue-100 text-blue-800",
-    urgent: "bg-orange-100 text-orange-800",
-    stat: "bg-red-100 text-red-800",
+    scheduled: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    confirmed: "bg-green-500/15 text-green-700 dark:text-green-300",
+    in_progress: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
+    completed: "bg-green-500/15 text-green-700 dark:text-green-300",
+    cancelled: "bg-red-500/15 text-red-700 dark:text-red-300",
+    no_show: "bg-gray-500/15 text-gray-700 dark:text-gray-300",
+    ordered: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    paid: "bg-green-500/15 text-green-700 dark:text-green-300",
+    pending: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
+    partial: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+    overdue: "bg-red-500/15 text-red-700 dark:text-red-300",
+    available: "bg-green-500/15 text-green-700 dark:text-green-300",
+    occupied: "bg-red-500/15 text-red-700 dark:text-red-300",
+    reserved: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
+    cleaning: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    maintenance: "bg-gray-500/15 text-gray-700 dark:text-gray-300",
+    active: "bg-green-500/15 text-green-700 dark:text-green-300",
+    discharged: "bg-gray-500/15 text-gray-700 dark:text-gray-300",
+    transferred: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+    routine: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    urgent: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+    stat: "bg-red-500/15 text-red-700 dark:text-red-300",
   };
 
-  let style = $derived(statusStyles[status] || "bg-gray-100 text-gray-800");
+  let style = $derived(statusStyles[status] || "bg-gray-500/15 text-gray-700 dark:text-gray-300");
   let label = $derived(status.replace(/_/g, " "));
 </script>
 

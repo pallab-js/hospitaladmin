@@ -55,7 +55,7 @@ export const appointmentSchema = z.object({
   appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
   appointment_time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
   duration_minutes: z.number().min(5, "Duration must be at least 5 minutes").max(480, "Duration must be at most 480 minutes").optional(),
-  visit_type: z.enum(["consultation", "follow_up", "emergency", "walk_in"]).optional(),
+  visit_type: z.enum(["consultation", "follow_up", "emergency", "walk_in", "routine_checkup"]).optional(),
   reason: z.string().optional(),
 });
 

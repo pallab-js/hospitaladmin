@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { auth } from "$lib/stores/auth.js";
-  import { notifications } from "$lib/stores/notifications.js";
   import { login } from "$lib/lib/api.js";
   import Button from "$lib/components/ui/button/index.svelte";
   import Input from "$lib/components/ui/input/index.svelte";
@@ -12,6 +11,7 @@
   import CardDescription from "$lib/components/ui/card/card-description.svelte";
   import CardContent from "$lib/components/ui/card/card-content.svelte";
   import { Activity } from "@lucide/svelte";
+  import { loginSchema } from "$lib/lib/validation.js";
 
   let username = $state("");
   let password = $state("");
@@ -19,8 +19,9 @@
   let error = $state("");
 
   async function handleLogin() {
-    if (!username || !password) {
-      error = "Please enter username and password";
+    const result = loginSchema.safeParse({ username, password });
+    if (!result.success) {
+      error = result.error.issues[0]?.message || "Please enter username and password";
       return;
     }
 
@@ -31,11 +32,6 @@
       const result = await login(username, password);
       if (result.success && result.user) {
         auth.login(result.user);
-        notifications.add({
-          type: "success",
-          title: "Welcome back!",
-          message: `Logged in as ${result.user.full_name || result.user.username}`,
-        });
         goto("/dashboard");
       } else {
         error = result.message;

@@ -58,8 +58,8 @@ pub async fn create_patient(request: CreatePatientRequest) -> Result<Patient, St
 pub async fn get_patients(page: Option<i64>, limit: Option<i64>) -> Result<Vec<Patient>, String> {
     guards::authenticated()?;
     let pool = get_pool();
-    let page = page.unwrap_or(1);
-    let limit = limit.unwrap_or(20);
+    let page = page.unwrap_or(1).max(1);
+    let limit = limit.unwrap_or(20).clamp(1, 100);
     let offset = (page - 1) * limit;
 
     sqlx::query_as::<_, Patient>(
@@ -117,8 +117,8 @@ pub async fn search_patients(params: PatientSearchParams) -> Result<Vec<Patient>
 
     query.push_str(" ORDER BY created_at DESC LIMIT ? OFFSET ?");
 
-    let page = params.page.unwrap_or(1);
-    let limit = params.limit.unwrap_or(20);
+    let page = params.page.unwrap_or(1).max(1);
+    let limit = params.limit.unwrap_or(20).clamp(1, 100);
     let offset = (page - 1) * limit;
 
     let mut sql = sqlx::query_as::<_, Patient>(&query);

@@ -41,33 +41,28 @@ pub fn set_session(session: Session) {
 }
 
 pub fn get_session() -> Option<Session> {
-    // Purge expired sessions on read (cheap sweep)
     let now = now_epoch();
     SESSIONS.retain(|_, entry| now <= entry.expires_at);
 
-    // For the current session model we return the first active session.
-    // In a multi-user desktop app, this should be keyed by a window/context ID.
-    // For now we iterate — DashMap makes this lock-free.
-    SESSIONS.iter().find_map(|entry| {
-        if now <= entry.value().expires_at {
-            Some(entry.value().session.clone())
-        } else {
-            None
-        }
-    })
+    // In a single-user desktop app, there should be at most one active session.
+    // If multiple exist (race condition), return the most recently created one.
+    SESSIONS
+        .iter()
+        .filter(|entry| now <= entry.value().expires_at)
+        .max_by_key(|entry| entry.value().session.created_at)
+        .map(|entry| entry.value().session.clone())
 }
 
-/// Refresh session expiry on activity. Returns true if refreshed.
-pub fn refresh_session() -> bool {
+/// Refresh session expiry on activity for the given user. Returns true if refreshed.
+pub fn refresh_session(user_id: &str) -> bool {
     let now = now_epoch();
-    let mut refreshed = false;
-    for mut entry in SESSIONS.iter_mut() {
+    if let Some(mut entry) = SESSIONS.get_mut(user_id) {
         if now <= entry.value().expires_at {
             entry.value_mut().expires_at = now + SESSION_EXPIRY_SECONDS;
-            refreshed = true;
+            return true;
         }
     }
-    refreshed
+    false
 }
 
 pub fn clear_user_session(user_id: &str) {

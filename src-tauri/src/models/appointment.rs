@@ -55,7 +55,7 @@ impl CreateAppointmentRequest {
             }
         }
         if let Some(ref vt) = self.visit_type {
-            let valid_types = ["consultation", "follow_up", "emergency", "walk_in"];
+            let valid_types = ["consultation", "follow_up", "emergency", "walk_in", "routine_checkup"];
             if !valid_types.contains(&vt.as_str()) {
                 return Err("Invalid visit type".to_string());
             }

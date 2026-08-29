@@ -98,7 +98,7 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                 .bind(&user_id)
                 .execute(pool)
                 .await
-                .ok();
+                .map_err(|_| "Failed to reset login attempts".to_string())?;
 
                 let full_name = if let Some(ref emp_id) = employee_id {
                     sqlx::query("SELECT first_name, last_name FROM staff WHERE id = ?")
@@ -120,7 +120,7 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                     .bind(&user_id)
                     .execute(pool)
                     .await
-                    .ok();
+                    .map_err(|_| "Failed to update last login time".to_string())?;
 
                 let session = Session {
                     user_id: user_id.clone(),
@@ -161,7 +161,7 @@ pub async fn login(request: LoginRequest) -> Result<LoginResponse, String> {
                 .bind(&request.username)
                 .execute(pool)
                 .await
-                .ok();
+                .map_err(|_| "Failed to track login attempt".to_string())?;
 
                 // Log failed attempt
                 if let Some(ref user_id_val) = row.get::<Option<String>, _>("id") {

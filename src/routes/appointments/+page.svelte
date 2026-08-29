@@ -18,6 +18,7 @@
   let appointments = $state<AppointmentWithDetails[]>([]);
   let loading = $state(true);
   let currentPage = $state(1);
+  let hasMore = $state(false);
   const pageSize = 15;
 
   onMount(async () => {
@@ -28,6 +29,7 @@
     loading = true;
     try {
       appointments = await getAppointments(currentPage, pageSize);
+      hasMore = appointments.length >= pageSize;
     } catch (e) {
       console.error("Failed to load appointments:", e);
     } finally {
@@ -120,7 +122,7 @@
             {/each}
           </TableBody>
         </Table>
-        {#if appointments.length >= pageSize}
+        {#if currentPage > 1 || hasMore}
           <div class="flex items-center justify-between border-t px-4 py-3">
             <p class="text-sm text-muted-foreground">Page {currentPage}</p>
             <div class="flex gap-2">
@@ -128,7 +130,7 @@
                 <ChevronLeft class="h-4 w-4 mr-1" />
                 Previous
               </Button>
-              <Button variant="outline" size="sm" onclick={nextPage}>
+              <Button variant="outline" size="sm" onclick={nextPage} disabled={!hasMore}>
                 Next
                 <ChevronRight class="h-4 w-4 ml-1" />
               </Button>

@@ -148,7 +148,7 @@ pub async fn get_dashboard_stats() -> Result<DashboardStats, String> {
 pub async fn get_revenue_chart(days: Option<i64>) -> Result<Vec<RevenueData>, String> {
     guards::admin_only()?;
     let pool = get_pool();
-    let days = days.unwrap_or(7);
+    let days = days.unwrap_or(7).clamp(1, 365);
 
     let rows = sqlx::query(
         r#"SELECT payment_date as date, SUM(amount) as amount
@@ -207,7 +207,7 @@ pub async fn get_department_load() -> Result<Vec<DepartmentLoad>, String> {
 pub async fn get_monthly_trends(months: Option<i64>) -> Result<Vec<MonthlyTrend>, String> {
     guards::admin_only()?;
     let pool = get_pool();
-    let months = months.unwrap_or(6);
+    let months = months.unwrap_or(6).clamp(1, 60);
 
     let rows = sqlx::query(
         r#"SELECT

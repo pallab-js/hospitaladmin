@@ -20,6 +20,10 @@
     "relative h-4 w-full overflow-hidden rounded-full bg-primary/20",
     className
   )}
+  role="progressbar"
+  aria-valuenow={value}
+  aria-valuemin={0}
+  aria-valuemax={max}
   {...restProps}
 >
   <div

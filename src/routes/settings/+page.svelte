@@ -1,7 +1,6 @@
 <script lang="ts">
   import { auth, userName, userRole } from "$lib/stores/auth.js";
   import { sidebar } from "$lib/stores/sidebar.js";
-  import { notifications } from "$lib/stores/notifications.js";
   import { updateMyProfile, changePassword } from "$lib/lib/api.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
   import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "$lib/components/ui/card/index.js";
@@ -10,20 +9,18 @@
   import Label from "$lib/components/ui/label/index.svelte";
   import Avatar from "$lib/components/ui/avatar/index.svelte";
   import AvatarFallback from "$lib/components/ui/avatar/avatar-fallback.svelte";
-  import { User, Bell, Shield, Palette, Check } from "@lucide/svelte";
+  import { User, Shield, Palette, Check } from "@lucide/svelte";
   import { getInitials } from "$lib/utils/index.js";
   import { profileUpdateSchema, passwordChangeSchema } from "$lib/lib/validation.js";
   import type { ProfileUpdateFormData, PasswordChangeFormData } from "$lib/lib/validation.js";
 
-  let profileName = $state($userName);
+  let profileFirstName = $state($userName.split(" ")[0] || "");
+  let profileLastName = $state($userName.split(" ").slice(1).join(" ") || "");
   let profileEmail = $state("");
   let currentPassword = $state("");
   let newPassword = $state("");
   let confirmPassword = $state("");
   let theme = $state("light");
-  let emailNotifications = $state(true);
-  let lowStockAlerts = $state(true);
-  let appointmentReminders = $state(false);
   let savingProfile = $state(false);
   let savingPassword = $state(false);
   let profileErrors = $state<Record<string, string>>({});
@@ -32,8 +29,8 @@
   function validateProfile(): boolean {
     profileErrors = {};
     const result = profileUpdateSchema.safeParse({
-      first_name: profileName.split(" ")[0] || "",
-      last_name: profileName.split(" ").slice(1).join(" ") || "",
+      first_name: profileFirstName || "",
+      last_name: profileLastName || "",
       email: profileEmail,
     });
     if (!result.success) {
@@ -67,16 +64,15 @@
     if (!validateProfile()) return;
     savingProfile = true;
     try {
-      const nameParts = profileName.split(" ");
       await updateMyProfile({
-        first_name: nameParts[0] || undefined,
-        last_name: nameParts.slice(1).join(" ") || undefined,
+        first_name: profileFirstName || undefined,
+        last_name: profileLastName || undefined,
         email: profileEmail || undefined,
       });
-      auth.update((user) => user ? { ...user, full_name: profileName } : null);
-      notifications.add({ type: "success", title: "Profile Updated", message: "Your profile has been saved" });
+      const fullName = `${profileFirstName} ${profileLastName}`.trim();
+      auth.update((user) => user ? { ...user, full_name: fullName } : null);
     } catch (e) {
-      notifications.add({ type: "error", title: "Error", message: "Failed to update profile" });
+      // Error handled by UI state
     } finally {
       savingProfile = false;
     }
@@ -87,14 +83,12 @@
     savingPassword = true;
     try {
       await changePassword(currentPassword, newPassword);
-      notifications.add({ type: "success", title: "Password Updated", message: "Your password has been changed" });
       currentPassword = "";
       newPassword = "";
       confirmPassword = "";
       passwordErrors = {};
     } catch (e: any) {
-      const message = e?.message || "Failed to update password";
-      notifications.add({ type: "error", title: "Error", message });
+      // Error handled by UI state
     } finally {
       savingPassword = false;
     }
@@ -103,7 +97,6 @@
   function setTheme(t: string) {
     theme = t;
     document.documentElement.classList.toggle("dark", t === "dark");
-    notifications.add({ type: "info", title: "Theme Changed", message: `Switched to ${t} theme` });
   }
 </script>
 
@@ -131,10 +124,17 @@
           </div>
         </div>
         <div class="space-y-2">
-          <Label for="name">Full Name</Label>
-          <Input id="name" bind:value={profileName} />
+          <Label for="first-name">First Name</Label>
+          <Input id="first-name" bind:value={profileFirstName} />
           {#if profileErrors.first_name}
             <p class="text-sm text-destructive">{profileErrors.first_name}</p>
+          {/if}
+        </div>
+        <div class="space-y-2">
+          <Label for="last-name">Last Name</Label>
+          <Input id="last-name" bind:value={profileLastName} />
+          {#if profileErrors.last_name}
+            <p class="text-sm text-destructive">{profileErrors.last_name}</p>
           {/if}
         </div>
         <div class="space-y-2">
@@ -193,43 +193,6 @@
           {:else}
             Update Password
           {/if}
-        </Button>
-      </CardContent>
-    </Card>
-
-    <!-- Notification Settings -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center gap-2">
-          <Bell class="h-5 w-5" />
-          Notifications
-        </CardTitle>
-        <CardDescription>Configure notification preferences</CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <label class="flex items-center justify-between cursor-pointer">
-          <div>
-            <p class="font-medium">Email Notifications</p>
-            <p class="text-sm text-muted-foreground">Receive email alerts for important events</p>
-          </div>
-          <input type="checkbox" class="h-5 w-5 rounded border-gray-300" bind:checked={emailNotifications} />
-        </label>
-        <label class="flex items-center justify-between cursor-pointer">
-          <div>
-            <p class="font-medium">Low Stock Alerts</p>
-            <p class="text-sm text-muted-foreground">Get notified when inventory is low</p>
-          </div>
-          <input type="checkbox" class="h-5 w-5 rounded border-gray-300" bind:checked={lowStockAlerts} />
-        </label>
-        <label class="flex items-center justify-between cursor-pointer">
-          <div>
-            <p class="font-medium">Appointment Reminders</p>
-            <p class="text-sm text-muted-foreground">Send reminders for upcoming appointments</p>
-          </div>
-          <input type="checkbox" class="h-5 w-5 rounded border-gray-300" bind:checked={appointmentReminders} />
-        </label>
-        <Button onclick={() => notifications.add({ type: "success", title: "Saved", message: "Notification preferences updated" })}>
-          Save Preferences
         </Button>
       </CardContent>
     </Card>

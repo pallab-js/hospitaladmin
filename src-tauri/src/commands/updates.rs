@@ -3,6 +3,35 @@ use crate::db::get_pool;
 use crate::utils::audit::log_audit;
 use serde::{Deserialize, Serialize};
 
+const MAX_NAME_LEN: usize = 100;
+const MAX_EMAIL_LEN: usize = 254;
+const MAX_PHONE_LEN: usize = 20;
+const MAX_ADDRESS_LEN: usize = 500;
+const MAX_CONTACT_NAME_LEN: usize = 200;
+const MAX_TEXT_LEN: usize = 2000;
+const MAX_LONG_TEXT_LEN: usize = 5000;
+
+fn validate_optional_str(value: &Option<String>, max_len: usize, field_name: &str) -> Result<(), String> {
+    if let Some(ref v) = value {
+        if v.len() > max_len {
+            return Err(format!("{} must be {} characters or less", field_name, max_len));
+        }
+    }
+    Ok(())
+}
+
+fn validate_optional_email(value: &Option<String>) -> Result<(), String> {
+    if let Some(ref v) = value {
+        if !v.is_empty() && !v.contains('@') {
+            return Err("Invalid email format".to_string());
+        }
+        if v.len() > MAX_EMAIL_LEN {
+            return Err(format!("Email must be {} characters or less", MAX_EMAIL_LEN));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateProfileRequest {
     pub first_name: Option<String>,
@@ -70,6 +99,15 @@ pub async fn update_my_profile(request: UpdateProfileRequest) -> Result<(), Stri
         .as_ref()
         .ok_or("No employee profile linked")?;
 
+    // Validate input lengths
+    validate_optional_str(&request.first_name, MAX_NAME_LEN, "First name")?;
+    validate_optional_str(&request.last_name, MAX_NAME_LEN, "Last name")?;
+    validate_optional_email(&request.email)?;
+    validate_optional_str(&request.phone, MAX_PHONE_LEN, "Phone")?;
+
+    // Only doctors can update qualification/specialization
+    let is_doctor = session.role == "doctor" || session.role == "admin";
+
     let mut sets = Vec::new();
     if request.first_name.is_some() {
         sets.push("first_name = ?");
@@ -83,10 +121,10 @@ pub async fn update_my_profile(request: UpdateProfileRequest) -> Result<(), Stri
     if request.phone.is_some() {
         sets.push("phone = ?");
     }
-    if request.qualification.is_some() {
+    if request.qualification.is_some() && is_doctor {
         sets.push("qualification = ?");
     }
-    if request.specialization.is_some() {
+    if request.specialization.is_some() && is_doctor {
         sets.push("specialization = ?");
     }
 
@@ -110,11 +148,15 @@ pub async fn update_my_profile(request: UpdateProfileRequest) -> Result<(), Stri
     if let Some(ref v) = request.phone {
         q = q.bind(v);
     }
-    if let Some(ref v) = request.qualification {
-        q = q.bind(v);
+    if request.qualification.is_some() && is_doctor {
+        if let Some(ref v) = request.qualification {
+            q = q.bind(v);
+        }
     }
-    if let Some(ref v) = request.specialization {
-        q = q.bind(v);
+    if request.specialization.is_some() && is_doctor {
+        if let Some(ref v) = request.specialization {
+            q = q.bind(v);
+        }
     }
     q = q.bind(emp_id);
 
@@ -128,12 +170,23 @@ pub async fn update_my_profile(request: UpdateProfileRequest) -> Result<(), Stri
 
 #[tauri::command]
 pub async fn update_patient(request: UpdatePatientRequest) -> Result<(), String> {
-    let session = guards::authenticated()?;
+    let session = guards::doctor_or_nurse()?;
     let pool = get_pool();
 
     if request.id.trim().is_empty() {
         return Err("Patient ID is required".into());
     }
+
+    // Validate input lengths
+    validate_optional_str(&request.first_name, MAX_NAME_LEN, "First name")?;
+    validate_optional_str(&request.last_name, MAX_NAME_LEN, "Last name")?;
+    validate_optional_str(&request.phone, MAX_PHONE_LEN, "Phone")?;
+    validate_optional_email(&request.email)?;
+    validate_optional_str(&request.address, MAX_ADDRESS_LEN, "Address")?;
+    validate_optional_str(&request.emergency_contact_name, MAX_CONTACT_NAME_LEN, "Emergency contact name")?;
+    validate_optional_str(&request.emergency_contact_phone, MAX_PHONE_LEN, "Emergency contact phone")?;
+    validate_optional_str(&request.allergies, MAX_TEXT_LEN, "Allergies")?;
+    validate_optional_str(&request.medical_history, MAX_LONG_TEXT_LEN, "Medical history")?;
 
     let mut sets = Vec::new();
     if request.first_name.is_some() {
@@ -237,6 +290,21 @@ pub async fn update_bed(request: UpdateWardBedRequest) -> Result<(), String> {
         return Err("Only nurses and admins can update bed information".into());
     }
 
+    // Validate status if provided
+    if let Some(ref status) = request.status {
+        let valid_statuses = ["available", "occupied", "reserved", "cleaning", "maintenance"];
+        if !valid_statuses.contains(&status.as_str()) {
+            return Err("Invalid bed status".into());
+        }
+    }
+
+    // Validate daily_rate if provided
+    if let Some(rate) = request.daily_rate {
+        if rate < 0.0 {
+            return Err("Daily rate cannot be negative".into());
+        }
+    }
+
     let mut sets = Vec::new();
     if request.status.is_some() {
         sets.push("status = ?");
@@ -287,6 +355,13 @@ pub async fn update_medication(request: UpdateMedicationRequest) -> Result<(), S
     let role = session.role.as_str();
     if role != "admin" && role != "pharmacist" {
         return Err("Only pharmacists and admins can update medications".into());
+    }
+
+    // Validate unit_price if provided
+    if let Some(price) = request.unit_price {
+        if price < 0.0 {
+            return Err("Unit price cannot be negative".into());
+        }
     }
 
     let mut sets = Vec::new();
@@ -346,6 +421,13 @@ pub async fn update_inventory(request: UpdateInventoryRequest) -> Result<(), Str
     let role = session.role.as_str();
     if role != "admin" && role != "pharmacist" {
         return Err("Only pharmacists and admins can update inventory".into());
+    }
+
+    // Validate quantity if provided
+    if let Some(qty) = request.quantity {
+        if qty < 0 {
+            return Err("Quantity cannot be negative".into());
+        }
     }
 
     let mut sets = Vec::new();

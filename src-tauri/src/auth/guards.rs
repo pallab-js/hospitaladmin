@@ -21,7 +21,7 @@ use super::session::{refresh_session, require_role, require_session, Session};
 
 pub fn authenticated() -> Result<Session, String> {
     let session = require_session()?;
-    refresh_session();
+    refresh_session(&session.user_id);
     Ok(session)
 }
 
@@ -30,13 +30,13 @@ pub fn doctor_only() -> Result<Session, String> {
     if session.role != "doctor" && session.role != "admin" {
         return Err("Doctor access required".to_string());
     }
-    refresh_session();
+    refresh_session(&session.user_id);
     Ok(session)
 }
 
 pub fn admin_only() -> Result<Session, String> {
     let session = require_role("admin")?;
-    refresh_session();
+    refresh_session(&session.user_id);
     Ok(session)
 }
 
@@ -45,7 +45,7 @@ pub fn lab_tech_only() -> Result<Session, String> {
     if session.role != "lab_tech" && session.role != "admin" {
         return Err("Lab technician access required".to_string());
     }
-    refresh_session();
+    refresh_session(&session.user_id);
     Ok(session)
 }
 
@@ -54,7 +54,7 @@ pub fn pharmacist_only() -> Result<Session, String> {
     if session.role != "pharmacist" && session.role != "admin" {
         return Err("Pharmacist access required".to_string());
     }
-    refresh_session();
+    refresh_session(&session.user_id);
     Ok(session)
 }
 
@@ -63,6 +63,24 @@ pub fn billing_only() -> Result<Session, String> {
     if session.role != "billing_staff" && session.role != "admin" {
         return Err("Billing staff access required".to_string());
     }
-    refresh_session();
+    refresh_session(&session.user_id);
+    Ok(session)
+}
+
+pub fn nurse_only() -> Result<Session, String> {
+    let session = require_session()?;
+    if session.role != "nurse" && session.role != "admin" {
+        return Err("Nurse access required".to_string());
+    }
+    refresh_session(&session.user_id);
+    Ok(session)
+}
+
+pub fn doctor_or_nurse() -> Result<Session, String> {
+    let session = require_session()?;
+    if session.role != "doctor" && session.role != "nurse" && session.role != "admin" {
+        return Err("Doctor or nurse access required".to_string());
+    }
+    refresh_session(&session.user_id);
     Ok(session)
 }

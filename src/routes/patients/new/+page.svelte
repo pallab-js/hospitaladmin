@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { createPatient } from "$lib/lib/api.js";
-  import { notifications } from "$lib/stores/notifications.js";
   import { patientSchema } from "$lib/lib/validation.js";
   import type { PatientFormData } from "$lib/lib/validation.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
@@ -55,18 +54,9 @@
     loading = true;
     try {
       const patient = await createPatient(form);
-      notifications.add({
-        type: "success",
-        title: "Patient Registered",
-        message: `${patient.first_name} ${patient.last_name} (${patient.patient_uid})`,
-      });
       goto(`/patients/${patient.id}`);
     } catch (e) {
-      notifications.add({
-        type: "error",
-        title: "Registration Failed",
-        message: "An error occurred while registering the patient",
-      });
+      // Error handled by UI state
     } finally {
       loading = false;
     }
@@ -199,11 +189,11 @@
           <CardContent class="space-y-4">
             <div class="space-y-2">
               <Label for="allergies">Known Allergies</Label>
-              <Input id="allergies" bind:value={form.allergies} placeholder="List any known allergies" />
+              <textarea id="allergies" bind:value={form.allergies} placeholder="List any known allergies" class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"></textarea>
             </div>
             <div class="space-y-2">
               <Label for="medical_history">Medical History</Label>
-              <Input id="medical_history" bind:value={form.medical_history} placeholder="Relevant medical history" />
+              <textarea id="medical_history" bind:value={form.medical_history} placeholder="Relevant medical history" class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"></textarea>
             </div>
           </CardContent>
         </Card>

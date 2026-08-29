@@ -52,7 +52,7 @@ pub struct RecordPaymentRequest {
 
 #[tauri::command]
 pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWithPatient, String> {
-    let session = guards::admin_only()?;
+    let session = guards::billing_only()?;
     let pool = get_pool();
     let id = Uuid::new_v4().to_string();
     let invoice_number = generate_invoice_number().await?;
@@ -144,7 +144,7 @@ pub async fn create_invoice(request: CreateInvoiceRequest) -> Result<InvoiceWith
 
 #[tauri::command]
 pub async fn record_payment(request: RecordPaymentRequest) -> Result<(), String> {
-    let session = guards::admin_only()?;
+    let session = guards::billing_only()?;
     let pool = get_pool();
     let id = Uuid::new_v4().to_string();
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();

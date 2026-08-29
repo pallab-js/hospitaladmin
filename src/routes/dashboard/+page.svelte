@@ -84,11 +84,11 @@
   });
 
   const maxRevenue = $derived(
-    revenueData.length > 0 ? Math.max(...revenueData.map((r) => r.amount)) : 1
+    revenueData.length > 0 ? Math.max(1, ...revenueData.map((r) => r.amount)) : 1
   );
   const maxDeptLoad = $derived(
     departmentData.length > 0
-      ? Math.max(...departmentData.map((d) => d.appointment_count), 1)
+      ? Math.max(1, ...departmentData.map((d) => d.appointment_count))
       : 1
   );
 

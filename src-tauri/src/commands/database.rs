@@ -1,5 +1,5 @@
 use crate::auth::guards;
-use crate::db::get_pool;
+use crate::db::get_db_path;
 use std::path::PathBuf;
 
 fn validate_export_path(path: &str) -> Result<PathBuf, String> {
@@ -29,7 +29,8 @@ fn validate_export_path(path: &str) -> Result<PathBuf, String> {
         return Err("Export path must be under home directory or /tmp".into());
     }
 
-    Ok(dest)
+    // Return the canonical path to prevent symlink-based attacks
+    Ok(canonical)
 }
 
 #[tauri::command]
@@ -43,12 +44,22 @@ pub async fn export_database(path: String) -> Result<String, String> {
             .map_err(|_| "Failed to create export directory".to_string())?;
     }
 
-    // VACUUM INTO doesn't support parameter binding — path is pre-validated above
-    let safe_path = dest.display().to_string().replace('\'', "''");
-    sqlx::query(&format!("VACUUM INTO '{}'", safe_path))
-        .execute(get_pool())
+    // Use safe file copy instead of VACUUM INTO to avoid SQL injection risks.
+    // First, ensure WAL is checkpointed so the copy includes all committed data.
+    let db_path = get_db_path();
+    sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+        .execute(crate::db::get_pool())
         .await
-        .map_err(|_| "Failed to export database".to_string())?;
+        .map_err(|_| "Failed to checkpoint WAL".to_string())?;
+
+    std::fs::copy(db_path, &dest)
+        .map_err(|e| format!("Failed to copy database: {}", e))?;
+
+    // Also copy the WAL and SHM files if they exist (for a consistent snapshot)
+    let wal_path = PathBuf::from(format!("{}-wal", db_path.display()));
+    let shm_path = PathBuf::from(format!("{}-shm", db_path.display()));
+    let _ = std::fs::copy(&wal_path, PathBuf::from(format!("{}-wal", dest.display())));
+    let _ = std::fs::copy(&shm_path, PathBuf::from(format!("{}-shm", dest.display())));
 
     Ok(format!("Database exported to {}", dest.display()))
 }

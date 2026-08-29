@@ -1,20 +1,9 @@
 <script lang="ts">
-  import { notifications } from "$lib/stores/notifications.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
   import Card from "$lib/components/ui/card/index.svelte";
-  import CardHeader from "$lib/components/ui/card/card-header.svelte";
-  import CardTitle from "$lib/components/ui/card/card-title.svelte";
   import CardContent from "$lib/components/ui/card/card-content.svelte";
   import Button from "$lib/components/ui/button/index.svelte";
   import { BarChart3, Download, FileText, Users, Bed, IndianRupee } from "@lucide/svelte";
-
-  function generateReport(title: string) {
-    notifications.add({
-      type: "success",
-      title: "Report Generated",
-      message: `${title} report has been generated and is ready for download`,
-    });
-  }
 
   const reports = [
     { title: "Daily Summary", description: "Overview of today's operations", icon: BarChart3 },
@@ -38,7 +27,7 @@
             <div class="flex-1">
               <h3 class="font-semibold">{report.title}</h3>
               <p class="text-sm text-muted-foreground mt-1">{report.description}</p>
-              <Button variant="link" class="p-0 h-auto mt-2" onclick={() => generateReport(report.title)}>
+              <Button variant="link" class="p-0 h-auto mt-2" disabled>
                 Generate Report
               </Button>
             </div>

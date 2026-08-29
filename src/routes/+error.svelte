@@ -1,12 +1,13 @@
 <script lang="ts">
   import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
   import Button from "$lib/components/ui/button/index.svelte";
   import Card from "$lib/components/ui/card/index.svelte";
   import CardContent from "$lib/components/ui/card/card-content.svelte";
   import { AlertTriangle, Home, RefreshCw } from "@lucide/svelte";
 
   function goHome() {
-    window.location.href = "/dashboard";
+    goto("/dashboard");
   }
 
   function refresh() {

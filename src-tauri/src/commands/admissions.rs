@@ -57,7 +57,7 @@ JOIN staff s ON a.doctor_id = s.id"#;
 pub async fn create_admission(
     request: CreateAdmissionRequest,
 ) -> Result<AdmissionWithDetails, String> {
-    let session = guards::doctor_only()?;
+    let session = guards::doctor_or_nurse()?;
 
     if request.patient_id.trim().is_empty() {
         return Err("Patient ID is required".to_string());
@@ -85,15 +85,18 @@ pub async fn create_admission(
         .await
         .map_err(|_| "Failed to start transaction".to_string())?;
 
-    let bed_status: String = sqlx::query_scalar("SELECT status FROM beds WHERE id = ?")
+    // Atomic check-and-update to prevent race condition on bed allocation.
+    // This UPDATE only succeeds if the bed is currently available, and returns
+    // the number of affected rows. If 0, the bed was already taken.
+    let affected = sqlx::query("UPDATE beds SET status = 'occupied' WHERE id = ? AND status = 'available'")
         .bind(&request.bed_id)
-        .fetch_optional(&mut *tx)
+        .execute(&mut *tx)
         .await
-        .map_err(|_| "Failed to check bed status".to_string())?
-        .unwrap_or_default();
+        .map_err(|_| "Failed to update bed status".to_string())?
+        .rows_affected();
 
-    if bed_status != "available" {
-        return Err("Bed is not available".to_string());
+    if affected == 0 {
+        return Err("Bed is not available (already occupied or does not exist)".to_string());
     }
 
     sqlx::query(
@@ -111,12 +114,6 @@ pub async fn create_admission(
     .execute(&mut *tx)
     .await
     .map_err(|_| "Failed to create admission".to_string())?;
-
-    sqlx::query("UPDATE beds SET status = 'occupied' WHERE id = ?")
-        .bind(&request.bed_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| "Failed to update bed status".to_string())?;
 
     tx.commit()
         .await
@@ -146,7 +143,7 @@ pub async fn create_admission(
 
 #[tauri::command]
 pub async fn discharge_patient(request: DischargeRequest) -> Result<(), String> {
-    let session = guards::doctor_only()?;
+    let session = guards::doctor_or_nurse()?;
     let pool = get_pool();
     let now = chrono::Local::now();
     let today = now.format("%Y-%m-%d").to_string();

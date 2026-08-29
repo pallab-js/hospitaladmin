@@ -7,7 +7,6 @@
   import { getCurrentUser } from "$lib/lib/api.js";
   import Sidebar from "$lib/components/layout/Sidebar.svelte";
   import Header from "$lib/components/layout/Header.svelte";
-  import Toast from "$lib/components/ui/toast/index.svelte";
   import type { UserRole } from "$lib/lib/types";
   import "../app.css";
 
@@ -29,8 +28,8 @@
       if (user) {
         auth.login(user);
       }
-    } catch (e) {
-      console.log("Not authenticated or running in browser mode");
+    } catch {
+      // Not authenticated or running in browser mode
     } finally {
       loading = false;
     }
@@ -54,8 +53,6 @@
     }
   });
 </script>
-
-<Toast />
 
 {#if loading}
   <div class="flex h-screen items-center justify-center bg-background">

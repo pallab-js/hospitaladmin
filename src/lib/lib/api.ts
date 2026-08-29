@@ -390,15 +390,15 @@ export async function getLabTests() {
   return invoke<LabTest[]>("get_lab_tests");
 }
 
-export async function getLabOrders() {
+export async function getLabOrders(page?: number, limit?: number) {
   if (!isTauri) return demoLabOrders;
-  return invoke<LabOrder[]>("get_lab_orders");
+  return invoke<LabOrder[]>("get_lab_orders", { page, limit });
 }
 
 // Billing commands
-export async function getInvoices() {
+export async function getInvoices(page?: number, limit?: number) {
   if (!isTauri) return demoInvoices;
-  return invoke<Invoice[]>("get_invoices");
+  return invoke<Invoice[]>("get_invoices", { page, limit });
 }
 
 // Dashboard commands

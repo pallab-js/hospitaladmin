@@ -3,7 +3,6 @@
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { getPatientById } from "$lib/lib/api.js";
-  import { notifications } from "$lib/stores/notifications.js";
   import type { Patient } from "$lib/lib/types.js";
   import PageLayout from "$lib/components/layout/PageLayout.svelte";
   import Button from "$lib/components/ui/button/index.svelte";
@@ -39,7 +38,7 @@
         Back
       </Button>
     </a>
-    <Button variant="outline" onclick={() => notifications.add({ type: "info", title: "Coming Soon", message: "Patient editing will be available in a future update" })}>
+    <Button variant="outline" disabled>
       <Edit class="h-4 w-4 mr-2" />
       Edit
     </Button>
@@ -177,7 +176,7 @@
                 Book Appointment
               </Button>
             </a>
-            <Button variant="outline" class="w-full justify-start" onclick={() => notifications.add({ type: "info", title: "Coming Soon", message: "Patient history view will be available in a future update" })}>
+            <Button variant="outline" class="w-full justify-start" disabled>
               <History class="h-4 w-4 mr-2" />
               View History
             </Button>

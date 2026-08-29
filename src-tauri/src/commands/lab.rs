@@ -32,9 +32,13 @@ pub async fn get_lab_tests() -> Result<Vec<LabTest>, String> {
 }
 
 #[tauri::command]
-pub async fn get_lab_orders() -> Result<Vec<LabOrderRow>, String> {
+pub async fn get_lab_orders(page: Option<i64>, limit: Option<i64>) -> Result<Vec<LabOrderRow>, String> {
     guards::authenticated()?;
     let pool = db::get_pool();
+    let page = page.unwrap_or(1).max(1);
+    let limit = limit.unwrap_or(20).clamp(1, 100);
+    let offset = (page - 1) * limit;
+
     let rows = sqlx::query(
         r#"SELECT lo.id, lo.appointment_id, lo.patient_id,
             p.first_name || ' ' || p.last_name as patient_name,
@@ -45,8 +49,10 @@ pub async fn get_lab_orders() -> Result<Vec<LabOrderRow>, String> {
         JOIN patients p ON lo.patient_id = p.id
         JOIN staff s ON lo.doctor_id = s.id
         ORDER BY lo.created_at DESC
-        LIMIT 20"#,
+        LIMIT ? OFFSET ?"#,
     )
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await
     .map_err(|_| "Failed to retrieve lab orders".to_string())?;

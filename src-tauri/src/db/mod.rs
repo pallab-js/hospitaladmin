@@ -17,6 +17,9 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&app_dir)?;
 
     let db_path = app_dir.join("hms.db");
+    DB_PATH
+        .set(db_path.clone())
+        .map_err(|_| "Database path already initialized".to_string())?;
     let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
 
     let options = SqliteConnectOptions::from_str(&db_url)?
@@ -42,7 +45,22 @@ pub async fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         );
         #[cfg(not(debug_assertions))]
         eprintln!("[db] Migration failed. Deleting stale database and retrying...");
+
+        // Create a backup before destroying the database
+        let backup_path = app_dir.join(format!(
+            "hms_backup_{}.db",
+            chrono::Local::now().format("%Y%m%d_%H%M%S")
+        ));
         drop(pool);
+        if let Err(backup_err) = std::fs::copy(&db_path, &backup_path) {
+            eprintln!("[db] Warning: failed to create backup: {}", backup_err);
+        } else {
+            eprintln!(
+                "[db] Backup saved to {}",
+                backup_path.display()
+            );
+        }
+
         std::fs::remove_file(&db_path)?;
         // Re-init with fresh DB
         let options2 = SqliteConnectOptions::from_str(&db_url)?
@@ -78,6 +96,14 @@ pub fn get_pool() -> &'static SqlitePool {
     DB_POOL
         .get()
         .expect("Database pool not initialized — app must call db::init() first")
+}
+
+static DB_PATH: OnceLock<std::path::PathBuf> = OnceLock::new();
+
+pub fn get_db_path() -> &'static std::path::PathBuf {
+    DB_PATH
+        .get()
+        .expect("Database path not initialized — app must call db::init() first")
 }
 
 async fn run_migrations(pool: &SqlitePool) -> Result<(), Box<dyn std::error::Error>> {
