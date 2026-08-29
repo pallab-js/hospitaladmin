@@ -2,6 +2,8 @@
 name = "hms"
 version = "0.1.0"
 edition = "2021"
+description = "Hospital Management System - desktop-first healthcare administration"
+license = "MIT"
 
 [lib]
 name = "hms_lib"

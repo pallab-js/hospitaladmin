@@ -1,7 +1,22 @@
 {
 	"name": "hms",
 	"private": true,
-	"version": "0.0.1",
+	"version": "0.1.0",
+	"description": "A modern, desktop-first hospital management system built with Tauri 2, SvelteKit 5, Rust, and SQLite. Features role-based dashboards, patient management, appointments, wards, lab, pharmacy, billing, prescriptions, admissions, and audit logging.",
+	"keywords": [
+		"hospital-management-system",
+		"healthcare",
+		"tauri",
+		"sveltekit",
+		"rust",
+		"sqlite",
+		"medical",
+		"patient-management",
+		"billing",
+		"pharmacy",
+		"ehr",
+		"clinic-management"
+	],
 	"packageManager": "pnpm@10.33.4",
 	"type": "module",
 	"scripts": {
